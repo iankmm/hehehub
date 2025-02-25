@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Search, MessageCircle, User, Plus } from 'lucide-react'
+import { Home, Search, MessageCircle, User, Plus, Image } from 'lucide-react'
 import { useState } from 'react'
 import CreatePost from './CreatePost'
 
@@ -22,7 +22,7 @@ export default function BottomNav() {
       <nav className="fixed bottom-0 left-0 right-0 bg-[#1f1f1f] border-t border-[#2f2f2f] z-40">
         <div className="flex items-center h-16 mx-auto relative max-w-lg">
           {/* Left Section */}
-          <div className="flex-1 flex justify-start space-x-12 pl-6">
+          <div className="flex-1 flex justify-start space-x-8 pl-6">
             <Link
               href="/"
               className={`flex flex-col items-center justify-center 
@@ -30,6 +30,15 @@ export default function BottomNav() {
             >
               <Home className="w-6 h-6" />
               <span className="text-xs mt-1">Home</span>
+            </Link>
+
+            <Link
+              href="/nfts"
+              className={`flex flex-col items-center justify-center 
+                       ${pathname === '/nfts' ? 'text-white' : 'text-[#898989]'}`}
+            >
+              <Image className="w-6 h-6" />
+              <span className="text-xs mt-1">NFTs</span>
             </Link>
 
             <button

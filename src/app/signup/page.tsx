@@ -1,110 +1,111 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
+import { useAccount } from 'wagmi'
+import { Laugh } from 'lucide-react'
 
 export default function SignupPage() {
   const [username, setUsername] = useState('')
-  const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
   const router = useRouter()
-
-  useEffect(() => {
-    // Check if user already exists
-    const user = localStorage.getItem('user')
-    if (user) {
-      router.push('/')
-    }
-  }, [router])
+  const { address } = useAccount()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
     setIsLoading(true)
+    setError('')
 
     try {
-      const address = localStorage.getItem('userAddress')
-      if (!address) {
-        router.push('/login')
-        return
-      }
-
-      const res = await fetch('/api/auth', {
+      const res = await fetch('/api/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ address, username }),
+        body: JSON.stringify({ username, address }),
       })
 
       const data = await res.json()
 
-      if (!res.ok) {
-        setError(data.error || 'Something went wrong')
-        return
+      if (res.ok) {
+        // Store user data and token
+        localStorage.setItem('token', data.token)
+        localStorage.setItem('user', JSON.stringify(data.user))
+        router.push('/')
+      } else {
+        setError(data.message || 'Something went wrong')
       }
-
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
-      router.push('/')
-    } catch (error) {
-      setError('Something went wrong. Please try again.')
+    } catch (err) {
+      setError('Failed to create account')
+      console.error('Signup error:', err)
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-[#121212] flex flex-col items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md"
-      >
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Choose a Username</h1>
-          <p className="text-[#898989]">This will be your display name in the app</p>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#1f1f1f] p-4">
+      <div className="w-full max-w-md space-y-8">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="bg-[#2f2f2f] p-4 rounded-full">
+            <Laugh className="w-12 h-12 text-blue-400" />
+          </div>
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-white">Create Your Account</h1>
+            <p className="mt-2 text-[#898989]">Choose a username to start sharing memes</p>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="bg-[#2f2f2f] rounded-lg p-6 space-y-6">
           <div>
+            <label htmlFor="username" className="block text-sm font-medium text-[#898989] mb-2">
+              Username
+            </label>
             <input
               type="text"
+              id="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter username"
-              className="w-full px-4 py-3 bg-[#1f1f1f] text-white rounded-lg 
-                       border border-[#2f2f2f] focus:border-blue-500 focus:outline-none
-                       placeholder-[#898989]"
+              placeholder="Enter your username"
+              className="w-full px-4 py-3 bg-[#1f1f1f] border border-[#3f3f3f] rounded-lg 
+                       text-white placeholder-[#898989] focus:outline-none focus:ring-2 
+                       focus:ring-blue-400 focus:border-transparent"
               required
               minLength={3}
               maxLength={20}
               pattern="^[a-zA-Z0-9_]+$"
               title="Username can only contain letters, numbers, and underscores"
             />
-            {error && (
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="mt-2 text-red-500 text-sm"
-              >
-                {error}
-              </motion.p>
-            )}
+            <p className="mt-2 text-xs text-[#898989]">
+              3-20 characters, letters, numbers, and underscores only
+            </p>
           </div>
+
+          {error && (
+            <div className="text-red-400 text-sm bg-red-400/10 p-3 rounded-lg">
+              {error}
+            </div>
+          )}
 
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg
-                     hover:bg-blue-700 transition-colors disabled:opacity-50
-                     disabled:cursor-not-allowed"
+            className="w-full bg-[#1f1f1f] text-white py-3 px-4 rounded-lg
+                     border border-[#3f3f3f] hover:bg-[#2a2a2a] transition-colors
+                     flex items-center justify-center space-x-2 disabled:opacity-50"
           >
-            {isLoading ? 'Creating Account...' : 'Create Account'}
+            {isLoading ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Creating Account...</span>
+              </>
+            ) : (
+              'Create Account'
+            )}
           </button>
         </form>
-      </motion.div>
+      </div>
     </div>
   )
 }

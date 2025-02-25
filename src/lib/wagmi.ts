@@ -1,13 +1,8 @@
-import { http } from 'wagmi'
-import { zksyncSepoliaTestnet } from 'viem/chains'
-import { 
-  injected, 
-  metaMask, 
-  walletConnect,
-  coinbaseWallet 
-} from 'wagmi/connectors'
-import { zksyncSsoConnector } from 'zksync-sso/connector'
+import { http, createConfig } from 'wagmi'
+import { zksyncSepoliaTestnet, baseSepolia } from 'viem/chains'
 import { defaultWagmiConfig } from '@web3modal/wagmi'
+import { createWeb3Modal } from '@web3modal/wagmi/react'
+import { injected } from 'wagmi/connectors'
 
 const projectId = 'f746603fbed4b93dcf0b83046062097e'
 
@@ -18,38 +13,65 @@ const metadata = {
   icons: ['/logo.png']
 }
 
-const ssoConnector = zksyncSsoConnector({
-  metadata,
-  options: {
-    preferPasskey: true, // Prioritize passkey authentication
-    skipAccountSelect: true, // Skip account selection if only one account
+// Configure RPC URLs
+const zkSyncRpcUrl = 'https://sepolia.era.zksync.dev'
+const baseSepoliaRpcUrl = process.env.BASE_RPC_URL || 'https://base-sepolia.g.alchemy.com/v2/I48lGBdelPSEVhpzmy0K153sVBX5DbjH'
+
+// Configure chains with RPC URLs
+const configuredZkSync = {
+  ...zksyncSepoliaTestnet,
+  rpcUrls: {
+    ...zksyncSepoliaTestnet.rpcUrls,
+    default: { http: [zkSyncRpcUrl] },
+    public: { http: [zkSyncRpcUrl] },
   }
+}
+
+const configuredBaseSepolia = {
+  ...baseSepolia,
+  rpcUrls: {
+    ...baseSepolia.rpcUrls,
+    default: { http: [baseSepoliaRpcUrl] },
+    public: { http: [baseSepoliaRpcUrl] },
+  }
+}
+
+// Configure chains
+const chains = [configuredZkSync, configuredBaseSepolia]
+
+// Create wagmi config
+const config = defaultWagmiConfig({
+  chains,
+  projectId,
+  metadata,
+  ssr: true,
+  transports: {
+    [configuredZkSync.id]: http(zkSyncRpcUrl),
+    [configuredBaseSepolia.id]: http(baseSepoliaRpcUrl),
+  },
+  connectors: [
+    injected(),
+  ],
+})
+
+// Initialize web3modal
+createWeb3Modal({
+  wagmiConfig: config,
+  projectId,
+  chains,
+  defaultChain: configuredBaseSepolia,
+  themeMode: 'dark',
+  themeVariables: {
+    '--w3m-accent': '#3b82f6', // blue-500
+  },
 })
 
 export function getConfig() {
-  return defaultWagmiConfig({
-    chains: [zksyncSepoliaTestnet],
-    projectId,
-    metadata,
-    connectors: [
-      ssoConnector,
-      metaMask(),
-      walletConnect({ projectId }),
-      coinbaseWallet({ appName: metadata.name }),
-      injected({
-        shimDisconnect: true,
-      }),
-    ],
-    transports: {
-      [zksyncSepoliaTestnet.id]: http(
-        'https://sepolia.era.zksync.dev'
-      ),
-    },
-  })
+  return config
 }
 
 declare module 'wagmi' {
   interface Register {
-    config: ReturnType<typeof getConfig>
+    config: typeof config
   }
 }

@@ -1,0 +1,13 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+remappings = [
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/"
+]
+solc = "0.8.19"
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+
+[rpc_endpoints]
+base_sepolia = "https://base-sepolia.g.alchemy.com/v2/I48lGBdelPSEVhpzmy0K153sVBX5DbjH"

@@ -1,6 +1,13 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { useGesture } from 'react-use-gesture';
+import { Image as ImageIcon } from 'lucide-react';
+import { useWriteContract, useAccount } from 'wagmi';
+import { waitForTransactionReceipt } from '@wagmi/core';
+import { getConfig } from '@/lib/wagmi';
+import HeheMemeABI from '@/contracts/HeheMeme.json';
+import { useRouter } from 'next/navigation';
+import { baseSepolia } from 'viem/chains';
 
 interface Image {
   id: string;
@@ -18,6 +25,8 @@ interface ImageReelProps {
 }
 
 export default function ImageReel({ images, onEndReached }: ImageReelProps) {
+  const router = useRouter();
+  const { isConnected } = useAccount();
   const [mounted, setMounted] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -25,26 +34,102 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
   const [showFakeHehe, setShowFakeHehe] = useState(false);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [imagesState, setImagesState] = useState<Image[]>(images);
+  const [isMinting, setIsMinting] = useState(false);
+  const [showConnectPrompt, setShowConnectPrompt] = useState(false);
+  const [showMintSuccess, setShowMintSuccess] = useState(false);
+  const [mintedTokenId, setMintedTokenId] = useState<string>();
+
+  const currentImage = imagesState[currentIndex];
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    console.log('Contract Address:', process.env.NEXT_PUBLIC_HEHEMEME_CONTRACT_ADDRESS);
+    console.log('Current Image URL:', currentImage?.imageUrl);
+  }, [currentImage]);
+
+  // Contract interaction hooks
+  const { writeContract, data: mintData, error: mintError } = useWriteContract();
 
   useEffect(() => {
-    setImagesState(images);
-    // Initialize likedPosts with posts that the user has already liked
-    const initialLikedPosts = new Set(
-      images.filter(img => img.hasLiked).map(img => img.id)
-    );
-    setLikedPosts(initialLikedPosts);
-  }, [images]);
-
-  useEffect(() => {
-    // Check if we're near the end and should load more
-    if (currentIndex >= imagesState.length - 2) {
-      onEndReached();
+    if (mintError) {
+      console.error('Mint error:', mintError);
+      setIsMinting(false);
     }
-  }, [currentIndex, imagesState.length, onEndReached]);
+  }, [mintError]);
+
+  useEffect(() => {
+    const waitForMint = async () => {
+      if (!mintData) return;
+      console.log('mintData', mintData) 
+      // try {
+        const receipt = await waitForTransactionReceipt(getConfig(), {
+          hash: mintData,
+          confirmations: 1
+        });
+        
+        // Find the MemeMinted event
+        const mintEvent = receipt.logs.find(log => {
+          try {
+            const event = decodeEventLog({
+              abi: HeheMemeABI.abi,
+              data: log.data,
+              topics: log.topics,
+            });
+            return event.eventName === 'MemeMinted';
+          } catch {
+            return false;
+          }
+        });
+
+        if (mintEvent) {
+          const { tokenId } = mintEvent.args;
+          setMintedTokenId(tokenId.toString());
+        }
+
+        setShowMintSuccess(true);
+        setTimeout(() => {
+          setShowMintSuccess(false);
+          setMintedTokenId(undefined);
+        }, 3000);
+      // } catch (error) {
+      //   console.error('Error waiting for transaction:', error);
+      // } finally {
+        setIsMinting(false);
+      // }
+    };
+
+    waitForMint();
+  }, [mintData]);
+
+  const handleMint = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!isConnected) {
+      setShowConnectPrompt(true);
+      setTimeout(() => setShowConnectPrompt(false), 3000);
+      return;
+    }
+
+    if (!currentImage?.imageUrl) {
+      console.error('No image URL available');
+      return;
+    }
+
+    if (isMinting) return;
+
+    setIsMinting(true);
+    try {
+      await writeContract({
+        address: process.env.NEXT_PUBLIC_HEHEMEME_CONTRACT_ADDRESS as `0x${string}`,
+        abi: HeheMemeABI.abi,
+        functionName: 'mintMeme',
+        args: [currentImage.imageUrl],
+      });
+    } catch (error) {
+      console.error('Error minting:', error);
+      setIsMinting(false);
+    }
+  };
 
   const handleLaugh = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -52,7 +137,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
 
     const token = localStorage.getItem('token');
     if (!token) {
-      window.location.href = '/signin';
+      window.location.href = '/login';
       return;
     }
 
@@ -105,7 +190,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
       } else if (res.status === 401) {
         // Token expired or invalid
         localStorage.removeItem('token');
-        window.location.href = '/signin';
+        window.location.href = '/login';
       }
     } catch (error) {
       console.error('Error updating like:', error);
@@ -140,9 +225,27 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
     }
   });
 
-  if (!mounted) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  const currentImage = imagesState[currentIndex];
+  useEffect(() => {
+    setImagesState(images);
+    // Initialize likedPosts with posts that the user has already liked
+    const initialLikedPosts = new Set(
+      images.filter(img => img.hasLiked).map(img => img.id)
+    );
+    setLikedPosts(initialLikedPosts);
+  }, [images]);
+
+  useEffect(() => {
+    // Check if we're near the end and should load more
+    if (currentIndex >= imagesState.length - 2) {
+      onEndReached();
+    }
+  }, [currentIndex, imagesState.length, onEndReached]);
+
+  if (!mounted) return null;
 
   return (
     <div className="fixed inset-0 bg-black">
@@ -217,84 +320,110 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
                 </div>
               </div>
 
-              {/* Like Button */}
-              <div className="absolute bottom-4 right-4 z-10">
-                <button
-                  onClick={handleLaugh}
-                  className={`bg-white/10 backdrop-blur-sm p-3 rounded-full transition-all ${
-                    likedPosts.has(currentImage.id) ? 'text-pink-500' : 'text-white'
-                  }`}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-8 w-8"
-                    fill={likedPosts.has(currentImage.id) ? 'currentColor' : 'none'}
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </button>
-              </div>
-
               {/* Side Actions */}
               <div className="absolute right-4 bottom-32 flex flex-col items-center gap-6">
-                <button 
-                  className="text-white flex flex-col items-center"
-                  onClick={handleLaugh}
+                {/* Mint NFT Button */}
+                <button
+                  onClick={handleMint}
+                  disabled={isMinting}
+                  className="bg-gradient-to-r from-purple-400 to-pink-600 text-white rounded-full p-3 
+                           hover:from-purple-500 hover:to-pink-700 transition-all duration-200 
+                           flex items-center justify-center
+                           relative group"
+                  title={isConnected ? 'Mint as NFT' : 'Connect wallet to mint'}
                 >
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors
-                              ${likedPosts.has(currentImage.id) 
-                                ? 'bg-blue-500 hover:bg-blue-600' 
-                                : 'bg-white/10 hover:bg-white/20'}`}
-                  >
-                    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm4-8c.55 0 1-.45 1-1s-.45-1-1-1-1 .45-1 1 .45 1 1 1zm-8 0c.55 0 1-.45 1-1s-.45-1-1-1-1 .45-1 1 .45 1 1 1zm4 5.12c2.33 0 4.29-1.46 5.05-3.5H6.95c.76 2.04 2.72 3.5 5.05 3.5z"/>
-                    </svg>
+                  {isMinting ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <ImageIcon className="w-5 h-5" />
+                  )}
+                  
+                  {/* Tooltip */}
+                  <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs py-1 px-2 rounded
+                                opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                    {isConnected ? 'Mint as NFT' : 'Connect wallet to mint'}
                   </div>
-                  <span className="text-sm mt-1">{currentImage.likes}</span>
                 </button>
 
-                <button 
-                  className="text-white flex flex-col items-center"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }}
+                {/* Like Button */}
+                <button
+                  onClick={handleLaugh}
+                  className={`rounded-full p-3 transition-all duration-200 flex items-center space-x-2 ${
+                    likedPosts.has(currentImage.id)
+                      ? 'bg-pink-600 text-white'
+                      : 'bg-white/10 text-white hover:bg-white/20'
+                  }`}
                 >
-                  <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
-                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/>
-                    </svg>
-                  </div>
-                  <span className="text-sm mt-1">Share</span>
+                  <span className="text-xl">🤣</span>
+                  <span className="font-medium">{currentImage.likes}</span>
                 </button>
+
+                {/* Connect Prompt */}
+                <AnimatePresence>
+                  {showConnectPrompt && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white text-xs py-1 px-2 rounded"
+                    >
+                      Please connect wallet first
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
+
+              {/* Mint Success Animation */}
+              <AnimatePresence>
+                {showMintSuccess && (
+                  <motion.div
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0, opacity: 0 }}
+                    className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none"
+                  >
+                    <div className="bg-black/80 backdrop-blur-sm rounded-xl p-8 text-center">
+                      <h3 className="text-3xl font-bold text-white mb-2">NFT Minted! 🎨</h3>
+                      {mintedTokenId && (
+                        <p className="text-gray-300">Token ID: #{mintedTokenId}</p>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Progress Bar */}
+              <div className="absolute top-2 left-0 right-0 px-4 z-50">
+                <div className="w-full bg-white/30 h-1 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-white h-full rounded-full transition-all duration-300"
+                    style={{ width: `${((currentIndex + 1) / imagesState.length) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Navigation Hints */}
+              {currentIndex < imagesState.length - 1 && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/50 text-sm animate-bounce">
+                  Swipe up for next
+                </div>
+              )}
+
+              {/* Debug Info */}
+              {/* {process.env.NODE_ENV === 'development' && (
+                <div className="absolute top-4 left-4 bg-black/50 p-2 rounded text-xs text-white">
+                  <div>Contract: {process.env.NEXT_PUBLIC_HEHEMEME_CONTRACT_ADDRESS}</div>
+                  <div>Connected: {isConnected ? 'Yes' : 'No'}</div>
+                  <div>Image URL: {currentImage?.imageUrl?.slice(0, 20)}...</div>
+                  <div>Is Minting: {isMinting ? 'Yes' : 'No'}</div>
+                  <div>Transaction Hash: {mintData}</div>
+                  <div>Error: {mintError ? String(mintError) : 'None'}</div>
+                  <div>Minted Token ID: {mintedTokenId || 'None'}</div>
+                </div>
+              )} */}
             </div>
           </motion.div>
         </AnimatePresence>
-
-        {/* Progress Bar */}
-        <div className="absolute top-2 left-0 right-0 px-4 z-50">
-          <div className="w-full bg-white/30 h-1 rounded-full overflow-hidden">
-            <div 
-              className="bg-white h-full rounded-full transition-all duration-300"
-              style={{ width: `${((currentIndex + 1) / imagesState.length) * 100}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Navigation Hints */}
-        {currentIndex < imagesState.length - 1 && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/50 text-sm animate-bounce">
-            Swipe up for next
-          </div>
-        )}
       </div>
     </div>
   );
