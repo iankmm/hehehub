@@ -69,7 +69,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
       });
 
       if (res.ok) {
-        // Update liked status
+        // Update liked status locally
         const newLikedPosts = new Set(likedPosts);
         if (isLiked) {
           newLikedPosts.delete(currentImage.id);
@@ -90,6 +90,18 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
           hasLiked: !isLiked
         };
         setImagesState(updatedImages);
+
+        // Refresh the posts data to get updated counts
+        const updatedRes = await fetch(`/api/posts?page=1&limit=${imagesState.length}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (updatedRes.ok) {
+          const data = await updatedRes.json();
+          setImagesState(data.posts);
+        }
       } else if (res.status === 401) {
         // Token expired or invalid
         localStorage.removeItem('token');

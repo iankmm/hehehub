@@ -1,12 +1,10 @@
-import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import jwt from 'jsonwebtoken'
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
+import { NextResponse } from 'next/server';
+import { verifyJwtToken } from '../../../../../lib/jwt';
+import { prisma } from '../../../../../lib/prisma';
 
 const verifyAuth = (token: string) => {
   try {
-    return jwt.verify(token, JWT_SECRET) as { userId: string }
+    return verifyJwtToken(token)
   } catch {
     return null
   }
@@ -29,8 +27,18 @@ export async function POST(
 
     const postId = params.id
 
-    // Create like and update user's heheScore in a transaction
+    // Create like and update heheScores in a transaction
     const result = await prisma.$transaction(async (prisma) => {
+      // Get the post with its author
+      const post = await prisma.post.findUnique({
+        where: { id: postId },
+        include: { user: true }
+      })
+
+      if (!post) {
+        throw new Error('Post not found')
+      }
+
       // Create the like
       const like = await prisma.like.create({
         data: {
@@ -39,17 +47,31 @@ export async function POST(
         },
       })
 
-      // Update user's heheScore
-      const user = await prisma.user.update({
+      // Update liker's heheScore (person who liked gets 1 point)
+      const liker = await prisma.user.update({
         where: { id: payload.userId },
         data: {
           heheScore: {
-            increment: 10,
+            increment: 1,
           },
         },
       })
 
-      return { like, heheScore: user.heheScore }
+      // Update post author's heheScore (post creator gets 1 point)
+      const author = await prisma.user.update({
+        where: { id: post.userId },
+        data: {
+          heheScore: {
+            increment: 1,
+          },
+        },
+      })
+
+      return { 
+        like,
+        likerScore: liker.heheScore,
+        authorScore: author.heheScore
+      }
     })
 
     return NextResponse.json(result)
@@ -85,8 +107,18 @@ export async function DELETE(
 
     const postId = params.id
 
-    // Delete like and update user's heheScore in a transaction
+    // Delete like and update heheScores in a transaction
     const result = await prisma.$transaction(async (prisma) => {
+      // Get the post with its author
+      const post = await prisma.post.findUnique({
+        where: { id: postId },
+        include: { user: true }
+      })
+
+      if (!post) {
+        throw new Error('Post not found')
+      }
+
       // Delete the like
       const like = await prisma.like.delete({
         where: {
@@ -97,27 +129,35 @@ export async function DELETE(
         },
       })
 
-      // Update user's heheScore
-      const user = await prisma.user.update({
+      // Update liker's heheScore (person who unliked loses 1 point)
+      const liker = await prisma.user.update({
         where: { id: payload.userId },
         data: {
           heheScore: {
-            decrement: 10,
+            decrement: 1,
           },
         },
       })
 
-      return { like, heheScore: user.heheScore }
+      // Update post author's heheScore (post creator loses 1 point)
+      const author = await prisma.user.update({
+        where: { id: post.userId },
+        data: {
+          heheScore: {
+            decrement: 1,
+          },
+        },
+      })
+
+      return {
+        like,
+        likerScore: liker.heheScore,
+        authorScore: author.heheScore
+      }
     })
 
     return NextResponse.json(result)
-  } catch (error: any) {
-    if (error.code === 'P2025') {
-      return NextResponse.json(
-        { error: 'Like not found' },
-        { status: 404 }
-      )
-    }
+  } catch (error) {
     console.error('Unlike error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },

@@ -4,7 +4,6 @@ import jwt from 'jsonwebtoken'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
 
-// Helper to verify JWT token
 const verifyAuth = (token: string) => {
   try {
     return jwt.verify(token, JWT_SECRET) as { userId: string }
@@ -13,7 +12,7 @@ const verifyAuth = (token: string) => {
   }
 }
 
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   try {
     // Get auth token from header
     const token = request.headers.get('Authorization')?.split(' ')[1]
@@ -27,57 +26,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
-    // Get request body
-    const { imageUrl, caption } = await request.json()
-
-    if (!imageUrl || !caption) {
-      return NextResponse.json(
-        { error: 'Image URL and caption are required' },
-        { status: 400 }
-      )
-    }
-
-    // Create post
-    const post = await prisma.post.create({
-      data: {
-        imageUrl,
-        caption,
-        userId: payload.userId,
-      },
-      include: {
-        user: {
-          select: {
-            username: true,
-            heheScore: true,
-          },
-        },
-        likes: true,
-      },
-    })
-
-    return NextResponse.json(post)
-  } catch (error) {
-    console.error('Post creation error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-}
-
-export async function GET(request: Request) {
-  try {
-    // Get auth token from header
-    const token = request.headers.get('Authorization')?.split(' ')[1]
-    let userId: string | undefined
-
-    if (token) {
-      const payload = verifyAuth(token)
-      if (payload) {
-        userId = payload.userId
-      }
-    }
-
     // Get pagination parameters from URL
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
@@ -85,10 +33,17 @@ export async function GET(request: Request) {
     const skip = (page - 1) * limit
 
     // Get total count for pagination
-    const totalCount = await prisma.post.count()
+    const totalCount = await prisma.post.count({
+      where: {
+        userId: payload.userId
+      }
+    })
 
     // Get paginated posts ordered by creation date
     const posts = await prisma.post.findMany({
+      where: {
+        userId: payload.userId
+      },
       orderBy: {
         createdAt: 'desc',
       },
@@ -102,16 +57,11 @@ export async function GET(request: Request) {
           },
         },
         likes: {
-          where: userId ? {
-            userId: userId
-          } : undefined,
+          where: {
+            userId: payload.userId,
+          },
           take: 1,
         },
-        _count: {
-          select: {
-            likes: true
-          }
-        }
       },
     })
 
@@ -120,7 +70,7 @@ export async function GET(request: Request) {
       id: post.id,
       imageUrl: post.imageUrl,
       caption: post.caption,
-      likes: post._count.likes,
+      likes: post._count?.likes || 0,
       username: post.user.username,
       heheScore: post.user.heheScore,
       hasLiked: post.likes.length > 0,
@@ -133,7 +83,7 @@ export async function GET(request: Request) {
       currentPage: page,
     })
   } catch (error) {
-    console.error('Error fetching posts:', error)
+    console.error('Error fetching user posts:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
