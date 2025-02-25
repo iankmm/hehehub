@@ -12,6 +12,14 @@ export default function AuthWrapper({
   const { status } = useAccount()
   const router = useRouter()
   const pathname = usePathname()
+  const isSignInPage = pathname === '/login'
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token && !isSignInPage) {
+      router.push('/signin');
+    }
+  }, [isSignInPage, router])
 
   useEffect(() => {
     if (status === 'disconnected' && pathname !== '/login') {

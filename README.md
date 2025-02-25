@@ -1,36 +1,205 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Hehe - A Meme Sharing Platform
 
-## Getting Started
+A TikTok-style meme sharing platform built with Next.js, where users can scroll through memes, like them with "hehe" reactions, and share their own memes.
 
-First, run the development server:
+## Complete Setup Guide
+
+### 1. Prerequisites
+
+- Node.js (v18 or higher)
+- PostgreSQL (v14 or higher)
+- pnpm (v8 or higher)
+
+### 2. Initial Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Install Node.js (using nvm)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+nvm install 18
+nvm use 18
+
+# Install pnpm
+curl -fsSL https://get.pnpm.io/install.sh | sh -
+source ~/.bashrc  # or source ~/.zshrc for macOS
+
+# Install PostgreSQL (macOS)
+brew install postgresql@14
+brew services start postgresql@14
+
+# Install PostgreSQL (Ubuntu/Debian)
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 3. Project Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# Clone the repository
+git clone <your-repo-url>
+cd hehe
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Install dependencies
+pnpm install
 
-## Learn More
+# Install Prisma CLI globally (optional but recommended)
+pnpm add -g prisma
+```
 
-To learn more about Next.js, take a look at the following resources:
+### 4. Database Setup
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+# Create database
+createdb hehe
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Set up Prisma
+pnpm add @prisma/client prisma
+npx prisma init
 
-## Deploy on Vercel
+# Create a new user (optional, if not using default postgres user)
+sudo -u postgres createuser -P -s -e your_username
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 5. Environment Configuration
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Create a `.env` file:
+```bash
+cp .env.example .env
+```
+
+Add the following to `.env`:
+```env
+# Database
+DATABASE_URL="postgresql://username:password@localhost:5432/hehe?schema=public"
+
+# Authentication
+JWT_SECRET="your-secure-jwt-secret"
+
+# Next.js
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+```
+
+### 6. Initialize Database Schema
+
+```bash
+# Run migrations
+npx prisma migrate dev
+
+# Generate Prisma client
+npx prisma generate
+
+# Seed database with test data
+npx tsx scripts/create-test-user.ts
+npx tsx scripts/seed-memes.ts
+```
+
+### 7. Start Development Server
+
+```bash
+pnpm dev
+```
+
+Visit [http://localhost:3000](http://localhost:3000)
+
+## Development
+
+### Available Commands
+
+```bash
+# Development
+pnpm dev          # Start development server
+pnpm build        # Build for production
+pnpm start        # Start production server
+pnpm lint         # Run linting
+pnpm type-check   # Run type checking
+
+# Database
+npx prisma studio        # Open database GUI
+npx prisma db push      # Push schema changes
+npx prisma migrate dev  # Create migration
+npx prisma generate     # Generate client
+
+# Testing
+pnpm test         # Run tests
+pnpm test:watch   # Run tests in watch mode
+```
+
+### Project Structure
+
+```
+hehe/
+├── prisma/                # Database schema and migrations
+├── public/               # Static assets
+│   └── uploads/         # Uploaded memes
+├── src/
+│   ├── app/             # Next.js app router pages
+│   ├── components/      # React components
+│   ├── lib/            # Utility functions
+│   └── styles/         # CSS styles
+├── scripts/            # Utility scripts
+└── tests/             # Test files
+```
+
+## Troubleshooting
+
+### Database Issues
+
+1. Connection errors:
+```bash
+# Check PostgreSQL status
+brew services list  # macOS
+sudo systemctl status postgresql  # Linux
+
+# Verify connection
+psql -d hehe -U your_username
+```
+
+2. Reset database:
+```bash
+dropdb hehe
+createdb hehe
+npx prisma migrate reset --force
+```
+
+### Image Upload Issues
+
+1. Check uploads directory:
+```bash
+# Create uploads directory if missing
+mkdir -p public/uploads
+chmod 755 public/uploads
+```
+
+2. Verify file permissions:
+```bash
+ls -la public/uploads
+```
+
+### Authentication Issues
+
+1. Clear browser data:
+```bash
+# In Chrome/Firefox dev tools
+localStorage.clear()
+```
+
+2. Verify JWT token:
+```bash
+# Check token in browser console
+localStorage.getItem('token')
+```
+
+## Security Best Practices
+
+1. Never commit `.env` files
+2. Use strong JWT secrets
+3. Keep dependencies updated
+4. Validate all user inputs
+5. Use HTTPS in production
+6. Implement rate limiting
+7. Regular security audits
+
+## License
+
+MIT

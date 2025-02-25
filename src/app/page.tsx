@@ -1,97 +1,97 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import AuthWrapper from '@/components/AuthWrapper';
-import { useAccount, useDisconnect } from 'wagmi';
+import CreatePost from '@/components/CreatePost';
 
 const ImageReel = dynamic(() => import('@/components/ImageReel'), {
   ssr: false
 });
 
-// Mock data using real meme templates from Imgflip
-const mockImages = [
-  {
-    id: '1',
-    url: 'https://i.imgflip.com/1bij.jpg', // "One Does Not Simply" meme
-    caption: 'One does not simply write bug-free code 😅 #CodingLife',
-    likes: 45234,
-    username: 'meme.dev'
-  },
-  {
-    id: '2',
-    url: 'https://i.imgflip.com/26am.jpg', // "Futurama Fry" meme
-    caption: 'Not sure if good code or just lucky it works 🤔 #ProgrammerLife',
-    likes: 38456,
-    username: 'debug.master'
-  },
-  {
-    id: '3',
-    url: 'https://i.imgflip.com/1bgw.jpg', // "Batman Slapping Robin" meme
-    caption: 'When someone suggests adding jQuery to a React project 🦇 #WebDev',
-    likes: 52921,
-    username: 'meme.coder'
-  },
-  {
-    id: '4',
-    url: 'https://i.imgflip.com/9vct.jpg', // "Doge" meme
-    caption: 'Much code, very bugs, wow 🐕 #DevLife',
-    likes: 41245,
-    username: 'code.memez'
-  },
-  {
-    id: '5',
-    url: 'https://i.imgflip.com/1bh8.jpg', // "Y U NO" meme
-    caption: 'Y U NO USE TYPESCRIPT??? 😤 #TypeScript',
-    likes: 47891,
-    username: 'devops.memes'
-  },
-  {
-    id: '6',
-    url: 'https://i.imgflip.com/1ihzfe.jpg', // "Roll Safe" meme
-    caption: 'Can\'t have bugs if you don\'t write code 🤯 #BigBrain',
-    likes: 62156,
-    username: 'frontend.fun'
-  },
-  {
-    id: '7',
-    url: 'https://i.imgflip.com/1g8my4.jpg', // "Evil Kermit" meme
-    caption: 'Me: Test the code\nAlso me: Push to production 🐸 #YOLO',
-    likes: 55789,
-    username: 'stackoverflow.memes'
-  },
-  {
-    id: '8',
-    url: 'https://i.imgflip.com/2hgfw.jpg', // "This is Fine" meme
-    caption: 'When production is on fire but it\'s Friday at 4:59 PM 🔥 #DevOps',
-    likes: 49876,
-    username: 'bug.finder'
-  },
-  {
-    id: '9',
-    url: 'https://i.imgflip.com/30b1gx.jpg', // "Drake" meme
-    caption: 'Writing documentation 👎\nWriting more code that needs documentation 👍 #DevLife',
-    likes: 65123,
-    username: 'git.master'
-  },
-  {
-    id: '10',
-    url: 'https://i.imgflip.com/28j0te.jpg', // "Surprised Pikachu" meme
-    caption: 'When you delete node_modules and npm install fixes everything 😮 #JavaScript',
-    likes: 53567,
-    username: 'tech.humor'
-  }
-];
+interface Post {
+  id: string;
+  imageUrl: string;
+  caption: string;
+  likes: number;
+  username: string;
+  heheScore: number;
+  hasLiked: boolean;
+}
+
+interface PostsResponse {
+  posts: Post[];
+  totalPages: number;
+  currentPage: number;
+}
 
 export default function Home() {
-  const { address } = useAccount();
-  const { disconnect } = useDisconnect();
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [showCreatePost, setShowCreatePost] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetchPosts = async (page: number) => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/posts?page=${page}&limit=10`, {
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+      if (res.ok) {
+        const data: PostsResponse = await res.json();
+        if (page === 1) {
+          setPosts(data.posts);
+        } else {
+          setPosts(prevPosts => [...prevPosts, ...data.posts]);
+        }
+        setTotalPages(data.totalPages);
+        setCurrentPage(data.currentPage);
+      }
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPosts(1);
+  }, []);
+
+  const formattedPosts = posts.map(post => ({
+    id: post.id,
+    imageUrl: post.imageUrl,
+    caption: post.caption,
+    likes: post.likes,
+    username: post.username,
+    heheScore: post.heheScore,
+    hasLiked: post.hasLiked
+  }));
+
+  const handleLoadMore = () => {
+    if (!isLoading && currentPage < totalPages) {
+      fetchPosts(currentPage + 1);
+    }
+  };
 
   return (
     <AuthWrapper>
       <div className="relative">
-        <ImageReel images={mockImages} />
-        
-
+        {posts.length === 0 ? (
+          <div className="min-h-screen bg-black flex items-center justify-center">
+            <div className="text-center">
+              <h2 className="text-white text-xl mb-2">No memes yet</h2>
+              <p className="text-gray-400">Be the first to post a meme!</p>
+            </div>
+          </div>
+        ) : (
+          <ImageReel images={formattedPosts} onEndReached={handleLoadMore} />
+        )}
+        <CreatePost />
       </div>
     </AuthWrapper>
   );

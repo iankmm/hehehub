@@ -35,6 +35,13 @@
   }
 }
 
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translate(-50%, 10px); }
+  15% { opacity: 1; transform: translate(-50%, 0); }
+  85% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -10px); }
+}
+
 .animate-gradient {
   background-size: 200% 200%;
   animation: gradient 6s ease infinite;
@@ -42,6 +49,10 @@
 
 .animate-blob {
   animation: blob 7s infinite;
+}
+
+.animate-fade-in-out {
+  animation: fadeInOut 2s ease-in-out forwards;
 }
 
 .animation-delay-2000 {
