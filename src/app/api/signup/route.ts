@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase-admin'
 import { createJwtToken } from '@/lib/jwt'
+import { v4 as uuidv4 } from 'uuid'
 
 export async function POST(request: Request) {
   try {
@@ -12,24 +13,35 @@ export async function POST(request: Request) {
     }
 
     // Check if username is already taken
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        username: username
-      }
-    })
+    const { data: existingUser, error: checkError } = await supabase
+      .from('User')
+      .select()
+      .eq('username', username)
+      .single()
 
     if (existingUser) {
       return NextResponse.json({ message: 'Username is already taken' }, { status: 400 })
     }
 
     // Create new user
-    const user = await prisma.user.create({
-      data: {
+    const userId = uuidv4()
+    const { data: user, error: createError } = await supabase
+      .from('User')
+      .insert({
+        id: userId,
         username,
         address: address.toLowerCase(),
-        heheScore: 0
-      }
-    })
+        heheScore: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      })
+      .select()
+      .single()
+
+    if (createError) {
+      console.error('User creation error:', createError)
+      return NextResponse.json({ message: 'Error creating user' }, { status: 500 })
+    }
 
     // Generate JWT token
     const token = createJwtToken({

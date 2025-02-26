@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase-admin'
 import jwt from 'jsonwebtoken'
+import { v4 as uuidv4 } from 'uuid'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
 
@@ -37,16 +38,26 @@ export async function POST(request: Request) {
       )
     }
 
+    // Generate a unique ID for the post
+    const postId = uuidv4()
+
     const { data: post, error } = await supabase
       .from('Post')
       .insert({
+        id: postId,
         imageUrl,
         caption,
         userId: payload.userId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       })
-      .select('*, user:User(username, heheScore)')
+      .select(`
+        *,
+        user:User!inner(
+          username,
+          heheScore
+        )
+      `)
       .single()
 
     if (error) throw error
@@ -90,8 +101,13 @@ export async function GET(request: Request) {
       .from('Post')
       .select(`
         *,
-        user:User(username, heheScore),
-        likes:Like(userId)
+        user:User!inner(
+          username,
+          heheScore
+        ),
+        likes:Like(
+          userId
+        )
       `)
       .order('createdAt', { ascending: false })
       .range(start, start + limit - 1)
@@ -99,14 +115,14 @@ export async function GET(request: Request) {
     if (error) throw error
 
     // Format posts for response
-    const formattedPosts = posts.map((post) => ({
+    const formattedPosts = posts.map((post: any) => ({
       id: post.id,
       imageUrl: post.imageUrl,
       caption: post.caption,
       likes: post.likes.length,
       username: post.user.username,
       heheScore: post.user.heheScore,
-      hasLiked: userId ? post.likes.some(like => like.userId === userId) : false,
+      hasLiked: userId ? post.likes.some((like: { userId: string }) => like.userId === userId) : false,
       createdAt: post.createdAt,
     }))
 
