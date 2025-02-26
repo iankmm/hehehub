@@ -188,8 +188,8 @@ export default function CreatePost({ isOpen, setIsOpen }: CreatePostProps) {
                 <button
                   type="submit"
                   disabled={isLoading || !selectedFile}
-                  className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg
-                           hover:bg-blue-700 transition-colors disabled:opacity-50
+                  className="w-full px-4 py-3 bg-pink-500 text-white rounded-lg
+                           hover:bg-pink-600 transition-colors disabled:opacity-50
                            disabled:cursor-not-allowed"
                 >
                   {isLoading ? 'Posting...' : 'Post Meme'}

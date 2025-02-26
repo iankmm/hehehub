@@ -61,8 +61,8 @@ export default function BottomNav() {
           <div className="absolute left-1/2 -translate-x-1/2 -top-5">
             <button
               onClick={() => setIsCreateOpen(true)}
-              className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center
-                       hover:bg-blue-700 transition-colors shadow-lg
+              className="w-16 h-16 bg-pink-500 rounded-full flex items-center justify-center
+                       hover:bg-pink-600 transition-colors shadow-lg
                        border-4 border-[#1f1f1f]"
             >
               <Plus className="w-8 h-8 text-white" />

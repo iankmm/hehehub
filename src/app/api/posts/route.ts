@@ -49,15 +49,14 @@ export async function POST(request: Request) {
           select: {
             username: true,
             heheScore: true,
-          },
-        },
-        likes: true,
-      },
+          }
+        }
+      }
     })
 
     return NextResponse.json(post)
   } catch (error) {
-    console.error('Post creation error:', error)
+    console.error('Error in POST /api/posts:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -84,36 +83,36 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '10')
     const skip = (page - 1) * limit
 
-    // Get total count for pagination
-    const totalCount = await prisma.post.count()
-
-    // Get paginated posts ordered by creation date
-    const posts = await prisma.post.findMany({
-      orderBy: {
-        createdAt: 'desc',
-      },
-      skip,
-      take: limit,
-      include: {
-        user: {
-          select: {
-            username: true,
-            heheScore: true,
+    // Wrap database operations in a transaction
+    const [totalCount, posts] = await prisma.$transaction([
+      prisma.post.count(),
+      prisma.post.findMany({
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip,
+        take: limit,
+        include: {
+          user: {
+            select: {
+              username: true,
+              heheScore: true,
+            },
           },
-        },
-        likes: {
-          where: userId ? {
-            userId: userId
-          } : undefined,
-          take: 1,
-        },
-        _count: {
-          select: {
-            likes: true
+          likes: {
+            where: userId ? {
+              userId: userId
+            } : undefined,
+            take: 1,
+          },
+          _count: {
+            select: {
+              likes: true
+            }
           }
-        }
-      },
-    })
+        },
+      })
+    ])
 
     // Format posts for response
     const formattedPosts = posts.map((post) => ({
@@ -123,17 +122,16 @@ export async function GET(request: Request) {
       likes: post._count.likes,
       username: post.user.username,
       heheScore: post.user.heheScore,
-      hasLiked: post.likes.length > 0,
-      createdAt: post.createdAt,
+      hasLiked: post.likes.length > 0
     }))
 
     return NextResponse.json({
       posts: formattedPosts,
       totalPages: Math.ceil(totalCount / limit),
-      currentPage: page,
+      currentPage: page
     })
   } catch (error) {
-    console.error('Error fetching posts:', error)
+    console.error('Error in GET /api/posts:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

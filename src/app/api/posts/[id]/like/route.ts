@@ -57,7 +57,7 @@ export async function POST(
         },
       })
 
-      // Update post author's heheScore (post creator gets 1 point)
+      // Update post author's heheScore (post creator gets 5 points)
       const author = await prisma.user.update({
         where: { id: post.userId },
         data: {

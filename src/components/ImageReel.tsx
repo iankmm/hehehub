@@ -4,6 +4,7 @@ import { useGesture } from 'react-use-gesture';
 import { Image as ImageIcon } from 'lucide-react';
 import { useWriteContract, useAccount } from 'wagmi';
 import { waitForTransactionReceipt } from '@wagmi/core';
+import { decodeEventLog } from 'viem';
 import { getConfig } from '@/lib/wagmi';
 import HeheMemeABI from '@/contracts/HeheMeme.json';
 import { useRouter } from 'next/navigation';
@@ -26,7 +27,7 @@ interface ImageReelProps {
 
 export default function ImageReel({ images, onEndReached }: ImageReelProps) {
   const router = useRouter();
-  const { isConnected } = useAccount();
+  const { isConnected, address, status } = useAccount();
   const [mounted, setMounted] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -38,16 +39,41 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
   const [showConnectPrompt, setShowConnectPrompt] = useState(false);
   const [showMintSuccess, setShowMintSuccess] = useState(false);
   const [mintedTokenId, setMintedTokenId] = useState<string>();
+  const [isWalletReady, setIsWalletReady] = useState(false);
 
   const currentImage = imagesState[currentIndex];
 
-  useEffect(() => {
-    console.log('Contract Address:', process.env.NEXT_PUBLIC_HEHEMEME_CONTRACT_ADDRESS);
-    console.log('Current Image URL:', currentImage?.imageUrl);
-  }, [currentImage]);
-
   // Contract interaction hooks
   const { writeContract, data: mintData, error: mintError } = useWriteContract();
+
+  // Handle wallet initialization
+  useEffect(() => {
+    const initializeWallet = async () => {
+      // Wait for wallet to be fully initialized
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setMounted(true);
+      setIsWalletReady(true);
+    };
+
+    initializeWallet();
+  }, []);
+
+  // Monitor wallet connection status
+  useEffect(() => {
+    if (!mounted) return;
+    
+    console.log('Wallet status:', {
+      isConnected,
+      status,
+      address,
+      isWalletReady
+    });
+
+    // Reset wallet ready state if disconnected
+    if (!isConnected || status === 'disconnected') {
+      setIsWalletReady(false);
+    }
+  }, [isConnected, status, address, mounted]);
 
   useEffect(() => {
     if (mintError) {
@@ -59,8 +85,8 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
   useEffect(() => {
     const waitForMint = async () => {
       if (!mintData) return;
-      console.log('mintData', mintData) 
-      // try {
+      
+      try {
         const receipt = await waitForTransactionReceipt(getConfig(), {
           hash: mintData,
           confirmations: 1
@@ -69,20 +95,28 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
         // Find the MemeMinted event
         const mintEvent = receipt.logs.find(log => {
           try {
-            const event = decodeEventLog({
+            const decodedLog = decodeEventLog({
               abi: HeheMemeABI.abi,
               data: log.data,
               topics: log.topics,
             });
-            return event.eventName === 'MemeMinted';
+            return decodedLog.eventName === 'MemeMinted';
           } catch {
             return false;
           }
         });
 
         if (mintEvent) {
-          const { tokenId } = mintEvent.args;
-          setMintedTokenId(tokenId.toString());
+          try {
+            const decodedLog = decodeEventLog({
+              abi: HeheMemeABI.abi,
+              data: mintEvent.data,
+              topics: mintEvent.topics,
+            });
+            setMintedTokenId(decodedLog.args.tokenId.toString());
+          } catch (error) {
+            console.error('Error decoding mint event:', error);
+          }
         }
 
         setShowMintSuccess(true);
@@ -90,11 +124,11 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
           setShowMintSuccess(false);
           setMintedTokenId(undefined);
         }, 3000);
-      // } catch (error) {
-      //   console.error('Error waiting for transaction:', error);
-      // } finally {
+      } catch (error) {
+        console.error('Error waiting for transaction:', error);
+      } finally {
         setIsMinting(false);
-      // }
+      }
     };
 
     waitForMint();
@@ -104,7 +138,15 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
     e.preventDefault();
     e.stopPropagation();
 
-    if (!isConnected) {
+    console.log('Mint clicked:', { 
+      isConnected, 
+      status, 
+      address,
+      isWalletReady,
+      mounted 
+    });
+
+    if (!isWalletReady || !isConnected || status !== 'connected' || !address) {
       setShowConnectPrompt(true);
       setTimeout(() => setShowConnectPrompt(false), 3000);
       return;
@@ -117,13 +159,20 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
 
     if (isMinting) return;
 
+    const contractAddress = process.env.NEXT_PUBLIC_HEHEMEME_CONTRACT_ADDRESS;
+    if (!contractAddress) {
+      console.error('Contract address not configured');
+      return;
+    }
+
     setIsMinting(true);
     try {
       await writeContract({
-        address: process.env.NEXT_PUBLIC_HEHEMEME_CONTRACT_ADDRESS as `0x${string}`,
+        address: contractAddress as `0x${string}`,
         abi: HeheMemeABI.abi,
         functionName: 'mintMeme',
         args: [currentImage.imageUrl],
+        chainId: baseSepolia.id,
       });
     } catch (error) {
       console.error('Error minting:', error);
@@ -137,7 +186,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
 
     const token = localStorage.getItem('token');
     if (!token) {
-      window.location.href = '/login';
+      router.push('/login');
       return;
     }
 
@@ -190,7 +239,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
       } else if (res.status === 401) {
         // Token expired or invalid
         localStorage.removeItem('token');
-        window.location.href = '/login';
+        router.push('/login');
       }
     } catch (error) {
       console.error('Error updating like:', error);
@@ -224,10 +273,6 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
       }
     }
   });
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     setImagesState(images);
@@ -326,8 +371,8 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
                 <button
                   onClick={handleMint}
                   disabled={isMinting}
-                  className="bg-gradient-to-r from-purple-400 to-pink-600 text-white rounded-full p-3 
-                           hover:from-purple-500 hover:to-pink-700 transition-all duration-200 
+                  className="bg-pink-500 text-white rounded-full p-3 
+                           hover:bg-pink-600 transition-all duration-200 
                            flex items-center justify-center
                            relative group"
                   title={isConnected ? 'Mint as NFT' : 'Connect wallet to mint'}
@@ -350,7 +395,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
                   onClick={handleLaugh}
                   className={`rounded-full p-3 transition-all duration-200 flex items-center space-x-2 ${
                     likedPosts.has(currentImage.id)
-                      ? 'bg-pink-600 text-white'
+                      ? 'bg-pink-500 text-white'
                       : 'bg-white/10 text-white hover:bg-white/20'
                   }`}
                 >
