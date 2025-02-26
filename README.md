@@ -31,6 +31,12 @@ sudo apt update
 sudo apt install postgresql postgresql-contrib
 sudo systemctl start postgresql
 sudo systemctl enable postgresql
+
+# WSL:
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+sudo service postgresql start
+
 ```
 
 ### 3. Project Setup
