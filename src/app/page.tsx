@@ -91,7 +91,7 @@ export default function Home() {
         ) : (
           <ImageReel images={formattedPosts} onEndReached={handleLoadMore} />
         )}
-        <CreatePost />
+        <CreatePost isOpen={showCreatePost} setIsOpen={setShowCreatePost} />
       </div>
     </AuthWrapper>
   );
