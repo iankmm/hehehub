@@ -31,8 +31,10 @@ export async function POST(request: Request) {
     const uploadDir = join(process.cwd(), 'public/uploads')
     try {
       await writeFile(join(uploadDir, '.keep'), '')
-    } catch (error) {
-      // Directory already exists
+    } 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    catch (error) {  
+      // Directory already exists  
     }
 
     // Convert File to Buffer

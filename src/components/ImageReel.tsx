@@ -6,8 +6,8 @@ import { useWriteContract, useAccount } from 'wagmi';
 import { waitForTransactionReceipt } from '@wagmi/core';
 import { getConfig } from '@/lib/wagmi';
 import HeheMemeABI from '@/contracts/HeheMeme.json';
-import { useRouter } from 'next/navigation';
-import { baseSepolia } from 'viem/chains';
+//import { useRouter } from 'next/navigation';
+//import { baseSepolia } from 'viem/chains';
 
 interface Image {
   id: string;
@@ -25,7 +25,7 @@ interface ImageReelProps {
 }
 
 export default function ImageReel({ images, onEndReached }: ImageReelProps) {
-  const router = useRouter();
+  //const router = useRouter();
   const { isConnected } = useAccount();
   const [mounted, setMounted] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -198,6 +198,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
   };
 
   const bind = useGesture({
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     onDrag: ({ movement: [mx, my], velocity, direction: [dx, dy], distance, last }) => {
       setIsDragging(true);
       
@@ -214,6 +215,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
         }
       }
     },
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     onWheel: ({ movement: [mx, my], velocity }) => {
       if (Math.abs(velocity) > 0.1) {
         if (my > 0 && currentIndex > 0) {

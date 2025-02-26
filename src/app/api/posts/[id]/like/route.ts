@@ -75,14 +75,16 @@ export async function POST(
     })
 
     return NextResponse.json(result)
-  } catch (error: any) {
-    if (error.code === 'P2002') {
-      return NextResponse.json(
-        { error: 'Already liked this post' },
-        { status: 400 }
-      )
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      if ('code' in error && error.code === 'P2002') {
+        return NextResponse.json(
+          { error: 'Already liked this post' },
+          { status: 400 }
+        )
+      }
+      console.error('Like error:', error.message);
     }
-    console.error('Like error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

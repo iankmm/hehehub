@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { X, Upload, Image as ImageIcon } from 'lucide-react'
 
 interface CreatePostProps {

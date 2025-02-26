@@ -35,7 +35,8 @@ export default function MePage() {
   const [isLoading, setIsLoading] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
-  const { address, connector, chain } = useAccount()
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { address , connector, chain } = useAccount() 
   const { disconnect } = useDisconnect()
   const router = useRouter()
 

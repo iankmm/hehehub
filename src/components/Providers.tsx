@@ -3,7 +3,7 @@
 import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { getConfig } from '@/lib/wagmi'
-import { Web3Modal } from '@web3modal/react'
+//import { Web3Modal } from '@web3modal/react'
 import { createWeb3Modal } from '@web3modal/wagmi/react'
 import { useState, useEffect } from 'react'
 

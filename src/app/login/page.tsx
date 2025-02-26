@@ -6,10 +6,10 @@ import { useRouter } from 'next/navigation'
 import { useWeb3Modal } from '@web3modal/wagmi/react'
 import { Laugh, MessageCircle, Trophy, WalletIcon } from 'lucide-react'
 
-interface User {
-  username: string
-  address: string
-}
+// interface User {
+//   username: string
+//   address: string
+// }
 
 export default function LoginPage() {
   const [isAuthenticating, setIsAuthenticating] = useState(false)

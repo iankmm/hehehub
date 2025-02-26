@@ -27,6 +27,7 @@ interface PostsResponse {
 
 export default function Home() {
   const [posts, setPosts] = useState<Post[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);

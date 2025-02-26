@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { http, createConfig } from 'wagmi'
 import { zksyncSepoliaTestnet, baseSepolia } from 'viem/chains'
 import { defaultWagmiConfig } from '@web3modal/wagmi'
