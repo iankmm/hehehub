@@ -40,6 +40,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
   const [showMintSuccess, setShowMintSuccess] = useState(false);
   const [mintedTokenId, setMintedTokenId] = useState<string>();
   const [isWalletReady, setIsWalletReady] = useState(false);
+  const [direction, setDirection] = useState(0);
 
   const currentImage = imagesState[currentIndex];
 
@@ -256,8 +257,10 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
         
         if (swipeThreshold) {
           if (dy > 0 && currentIndex > 0) {
+            setDirection(-1);
             setCurrentIndex(i => i - 1);
           } else if (dy < 0 && currentIndex < imagesState.length - 1) {
+            setDirection(1)
             setCurrentIndex(i => i + 1);
           }
         }
@@ -266,13 +269,19 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
     onWheel: ({ movement: [mx, my], velocity }) => {
       if (Math.abs(velocity) > 0.1) {
         if (my > 0 && currentIndex > 0) {
+          setDirection(-1)
           setCurrentIndex(i => i - 1);
         } else if (my < 0 && currentIndex < imagesState.length - 1) {
+          setDirection(1)
           setCurrentIndex(i => i + 1);
         }
       }
     }
   });
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     setImagesState(images);
@@ -292,21 +301,38 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
 
   if (!mounted) return null;
 
+  const variants = {
+    enter: (dir: number) => ({
+      y: dir > 0 ? 1000 : -1000,
+      opacity: 0
+    }),
+    center: {
+      y: 0,
+      opacity: 1
+    },
+    exit: (dir: number) => ({
+      y: dir > 0 ? -1000 : 1000,
+      opacity: 0
+    })
+  };
+
   return (
     <div className="fixed inset-0 bg-black">
       <div 
         className="h-full w-full relative touch-none flex items-center justify-center"
         {...bind()}
       >
-        <AnimatePresence initial={false}>
+        <AnimatePresence initial={false} custom={direction}>
           <motion.div
             key={currentIndex}
-            initial={{ y: isDragging ? 0 : 1000, opacity: isDragging ? 1 : 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -1000, opacity: 0 }}
+            custom={direction}
+            variants={variants}
+            initial="enter"
+            animate="center"
+            exit="exit"
             transition={{
-              y: { type: "spring", stiffness: 300, damping: isDragging ? 40 : 30 },
-              opacity: { duration: 0.2 }
+              y: { type: 'spring', stiffness: 300, damping: 30 },
+              opacity: { duration: 0.2 },
             }}
             className="absolute w-full h-full flex items-center justify-center"
           >

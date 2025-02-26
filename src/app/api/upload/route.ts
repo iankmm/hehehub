@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // Get file extension
+    // Get file extension and generate unique name
     const ext = file.name.split('.').pop()
     const fileName = `${uuidv4()}.${ext}`
 

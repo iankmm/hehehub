@@ -24,9 +24,7 @@ interface Post {
     username: string
     heheScore: number
   }
-  _count: {
-    likes: number
-  }
+  likes: any[]
 }
 
 export default function MePage() {
@@ -264,7 +262,7 @@ export default function MePage() {
                     />
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
                       <p className="text-sm text-white">
-                        {post._count.likes} HEHEs
+                        {post.likes?.length || 0} HEHEs
                       </p>
                     </div>
                   </motion.div>
