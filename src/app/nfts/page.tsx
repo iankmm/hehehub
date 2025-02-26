@@ -118,38 +118,44 @@ export default function NFTsPage() {
   }
 
   return (
-    <div className="min-h-screen p-4 pb-20 bg-[#1f1f1f] text-white">
-      <h1 className="text-2xl font-bold mb-6">Your Minted NFTs</h1>
-      
-      {loading ? (
-        <div className="flex justify-center items-center min-h-[200px]">
-          <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : nfts.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-[#898989]">No NFTs minted yet</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-4">
-          {nfts.map((nft) => (
-            <motion.div
-              key={nft.tokenId}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="relative aspect-square rounded-xl overflow-hidden bg-[#2f2f2f]"
-            >
-              <img
-                src={nft.imageUrl}
-                alt={`NFT #${nft.tokenId}`}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#1f1f1f]/80 to-transparent p-2">
-                <p className="text-sm font-medium text-white">#{nft.tokenId}</p>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      )}
+    <div className="min-h-screen bg-[#1f1f1f]">
+      {/* Fixed Header */}
+      <div className="fixed top-0 left-0 right-0 z-10 bg-[#1f1f1f] p-4 border-b border-[#2f2f2f]">
+        <h1 className="text-2xl font-bold text-white">Your Minted NFTs</h1>
+      </div>
+
+      {/* Scrollable Content */}
+      <div className="pt-20 pb-24 px-4">
+        {loading ? (
+          <div className="flex justify-center items-center min-h-[200px]">
+            <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : nfts.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-[#898989]">No NFTs minted yet</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4">
+            {nfts.map((nft) => (
+              <motion.div
+                key={nft.tokenId}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="relative aspect-square rounded-xl overflow-hidden bg-[#2f2f2f]"
+              >
+                <img
+                  src={nft.imageUrl}
+                  alt={`NFT #${nft.tokenId}`}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#1f1f1f]/80 to-transparent p-2">
+                  <p className="text-sm font-medium text-white">#{nft.tokenId}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
