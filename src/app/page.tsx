@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
-import AuthWrapper from '@/components/AuthWrapper';
 import CreatePost from '@/components/CreatePost';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -123,7 +122,6 @@ export default function Home() {
   }
 
   return (
-    <AuthWrapper>
       <div className="min-h-screen bg-[#1f1f1f]">
         {formattedPosts.length > 0 ? (
           <ImageReel images={formattedPosts} onEndReached={() => {
@@ -159,6 +157,5 @@ export default function Home() {
           />
         )}
       </div>
-    </AuthWrapper>
   );
 }

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Trophy, MessageCircle, User, Plus, Image } from 'lucide-react'
+import { Home, Trophy, MessageCircle, User, Plus } from 'lucide-react'
 import { useState } from 'react'
 import CreatePost from './CreatePost'
 
@@ -11,6 +11,8 @@ export default function BottomNav() {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [showComingSoon, setShowComingSoon] = useState(false)
 
+  const isActive = (path: string) => pathname === path
+
   const handleDiscoverClick = (e: React.MouseEvent) => {
     e.preventDefault()
     setShowComingSoon(true)
@@ -18,78 +20,65 @@ export default function BottomNav() {
   }
 
   return (
-    <>
-      <nav className="fixed bottom-0 left-0 right-0 bg-[#1f1f1f] border-t border-[#2f2f2f] z-40">
-        <div className="flex items-center h-16 mx-auto relative max-w-lg">
-          {/* Left Section */}
-          <div className="flex-1 flex justify-start space-x-8 pl-6">
-            <Link
+    <div className="fixed bottom-0 left-0 right-0 bg-[#1f1f1f] border-t border-[#2f2f2f] z-50">
+      <nav className="max-w-lg mx-auto px-4">
+        <ul className="flex items-center justify-between h-16">
+          <li className="flex-1">
+            <Link 
               href="/"
-              className={`flex flex-col items-center justify-center 
-                       ${pathname === '/' ? 'text-white' : 'text-[#898989]'}`}
-            >
-              <Home className="w-6 h-6" />
-              <span className="text-xs mt-1">Home</span>
-            </Link>
-
-            <Link
-              href="/nfts"
-              className={`flex flex-col items-center justify-center 
-                       ${pathname === '/nfts' ? 'text-white' : 'text-[#898989]'}`}
-            >
-              <Image className="w-6 h-6" />
-              <span className="text-xs mt-1">NFTs</span>
-            </Link>
-
-            <Link
-              href="/rankings"
-              className={`flex flex-col items-center justify-center flex-1 pt-2 pb-1 ${
-                pathname === '/rankings'
-                  ? 'text-pink-500'
-                  : 'text-[#898989] hover:text-white'
+              className={`flex flex-col items-center justify-center h-full ${
+                isActive('/') ? 'text-white' : 'text-[#898989]'
               }`}
             >
-              <Trophy className="w-6 h-6" />
+              <Home size={24} />
+              <span className="text-xs mt-1">Home</span>
+            </Link>
+          </li>
+          <li className="flex-1">
+            <Link
+              href="/rankings"
+              className={`flex flex-col items-center justify-center h-full ${
+                isActive('/rankings') ? 'text-pink-500' : 'text-[#898989] hover:text-white'
+              }`}
+            >
+              <Trophy size={24} />
               <span className="text-xs mt-1">Rankings</span>
             </Link>
-          </div>
-
-          {/* Center Plus Button */}
-          <div className="absolute left-1/2 -translate-x-1/2 -top-5">
+          </li>
+          <li className="flex-1 -mt-8">
             <button
               onClick={() => setIsCreateOpen(true)}
-              className="w-16 h-16 bg-pink-500 rounded-full flex items-center justify-center
-                       hover:bg-pink-600 transition-colors shadow-lg
-                       border-4 border-[#1f1f1f]"
+              className="flex flex-col items-center justify-center w-14 h-14 mx-auto bg-pink-500 rounded-full text-white shadow-lg transform transition-transform hover:scale-105"
             >
-              <Plus className="w-8 h-8 text-white" />
+              <Plus size={28} />
             </button>
-          </div>
-
-          {/* Right Section */}
-          <div className="flex-1 flex justify-end space-x-12 pr-6">
+          </li>
+          <li className="flex-1">
             <Link
               href="/chat"
-              className={`flex flex-col items-center justify-center
-                       ${pathname === '/chat' ? 'text-white' : 'text-[#898989]'}`}
+              className={`flex flex-col items-center justify-center h-full ${
+                isActive('/chat') ? 'text-white' : 'text-[#898989]'
+              }`}
             >
-              <MessageCircle className="w-6 h-6" />
+              <MessageCircle size={24} />
               <span className="text-xs mt-1">Chat</span>
             </Link>
-
+          </li>
+          <li className="flex-1">
             <Link
               href="/me"
-              className={`flex flex-col items-center justify-center
-                       ${pathname === '/me' ? 'text-white' : 'text-[#898989]'}`}
+              className={`flex flex-col items-center justify-center h-full ${
+                isActive('/me') ? 'text-white' : 'text-[#898989]'
+              }`}
             >
-              <User className="w-6 h-6" />
+              <User size={24} />
               <span className="text-xs mt-1">Me</span>
             </Link>
-          </div>
-        </div>
+          </li>
+        </ul>
       </nav>
 
       <CreatePost isOpen={isCreateOpen} setIsOpen={setIsCreateOpen} />
-    </>
+    </div>
   )
 }

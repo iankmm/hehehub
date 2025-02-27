@@ -3,10 +3,21 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { LogOut, Copy, ExternalLink } from 'lucide-react'
+import { LogOut, Copy, ExternalLink, Image as ImageIcon } from 'lucide-react'
 import Image from 'next/image'
-import AuthWrapper from '@/components/AuthWrapper'
-import { useDisconnect, useActiveWallet, useActiveAccount } from "thirdweb/react"
+import { useDisconnect, useActiveWallet, useActiveAccount, useReadContract } from "thirdweb/react"
+import { createThirdwebClient, getContract } from "thirdweb"
+import { baseSepolia } from "thirdweb/chains"
+
+const client = createThirdwebClient({
+  clientId: "8e1035b064454b1b9505e0dd626a8555"
+});
+
+const contract = getContract({
+  client,
+  address: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "",
+  chain: baseSepolia,
+});
 
 interface User {
   id: string
@@ -27,17 +38,85 @@ interface Post {
   likes: any[]
 }
 
+interface NFT {
+  tokenId: string
+  imageUrl: string
+}
+
+type Tab = 'posts' | 'nfts'
+
 export default function MePage() {
   const [user, setUser] = useState<User | null>(null)
   const [posts, setPosts] = useState<Post[]>([])
+  const [nfts, setNfts] = useState<NFT[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [activeTab, setActiveTab] = useState<Tab>('posts')
+  const [currentNftIndex, setCurrentNftIndex] = useState<number>(0)
+  const [isLoadingNFTs, setIsLoadingNFTs] = useState(true)
+  
   const activeAccount = useActiveAccount()
   const { disconnect } = useDisconnect()
   const wallet = useActiveWallet()
   const router = useRouter()
+
+  // NFT Contract Hooks
+  const { data: balance, isLoading: isLoadingBalance } = useReadContract({
+    contract,
+    method: "function balanceOf(address owner) view returns (uint256)",
+    params: activeAccount ? [activeAccount.address] : undefined,
+  })
+
+  const { data: tokenId, isLoading: isLoadingTokenId } = useReadContract({
+    contract,
+    method: "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
+    params: activeAccount ? [activeAccount.address, BigInt(currentNftIndex)] : undefined,
+  })
+
+  const { data: memeUrl, isLoading: isLoadingMemeUrl } = useReadContract({
+    contract,
+    method: "function getMemeUrl(uint256 tokenId) view returns (string)",
+    params: tokenId ? [tokenId] : undefined,
+  })
+
+  // Effect for NFT loading
+  useEffect(() => {
+    if (!activeAccount?.address) {
+      setNfts([])
+      setIsLoadingNFTs(false)
+      return
+    }
+
+    if (!isLoadingBalance && !balance) {
+      setNfts([])
+      setIsLoadingNFTs(false)
+      return
+    }
+
+    setIsLoadingNFTs(true)
+  }, [activeAccount?.address, balance, isLoadingBalance])
+
+  useEffect(() => {
+    if (!balance || isLoadingBalance || currentNftIndex >= Number(balance)) {
+      return
+    }
+
+    if (!isLoadingTokenId && !isLoadingMemeUrl && tokenId && memeUrl) {
+      setNfts(prev => [...prev, {
+        tokenId: tokenId.toString(),
+        imageUrl: memeUrl
+      }])
+
+      // Move to next NFT or finish
+      if (currentNftIndex + 1 < Number(balance)) {
+        setCurrentNftIndex(currentNftIndex + 1)
+      } else {
+        setIsLoadingNFTs(false)
+      }
+    }
+  }, [balance, isLoadingBalance, currentNftIndex, tokenId, memeUrl, isLoadingTokenId, isLoadingMemeUrl])
 
   const fetchPosts = async (page: number) => {
     setIsLoading(true)
@@ -170,7 +249,6 @@ export default function MePage() {
   }
 
   return (
-    <AuthWrapper>
       <div className="h-screen flex flex-col overflow-hidden bg-[#1f1f1f]">
         {/* Fixed Header Section */}
         <div className="sticky top-0 left-0 right-0 z-10 bg-[#1f1f1f]">
@@ -227,6 +305,40 @@ export default function MePage() {
                       {user.address}
                     </p>
                   </div>
+
+                  {/* Tabs */}
+                  <div className="flex space-x-4 border-b border-[#2f2f2f]">
+                    <button
+                      onClick={() => setActiveTab('posts')}
+                      className={`pb-2 px-1 text-sm font-medium transition-colors relative ${
+                        activeTab === 'posts' ? 'text-pink-500' : 'text-gray-400'
+                      }`}
+                    >
+                      Posts
+                      {activeTab === 'posts' && (
+                        <motion.div
+                          layoutId="tab-indicator"
+                          className="absolute bottom-0 left-0 right-0 h-0.5 bg-pink-500"
+                          initial={false}
+                        />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('nfts')}
+                      className={`pb-2 px-1 text-sm font-medium transition-colors relative ${
+                        activeTab === 'nfts' ? 'text-pink-500' : 'text-gray-400'
+                      }`}
+                    >
+                      NFTs
+                      {activeTab === 'nfts' && (
+                        <motion.div
+                          layoutId="tab-indicator"
+                          className="absolute bottom-0 left-0 right-0 h-0.5 bg-pink-500"
+                          initial={false}
+                        />
+                      )}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -236,45 +348,92 @@ export default function MePage() {
         {/* Scrollable Content Area */}
         <div className="flex-1 overflow-y-auto">
           <div className="px-4 py-8 pb-24">
-            <h2 className="text-xl font-semibold text-white mb-4">Your Posts</h2>
-            
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="space-y-4 text-center">
-                  <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto" />
-                  <p className="text-white">Loading posts...</p>
-                </div>
-              </div>
-            ) : posts.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-400">No posts yet</p>
-              </div>
+            {activeTab === 'posts' ? (
+              <>
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="space-y-4 text-center">
+                      <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                      <p className="text-white">Loading posts...</p>
+                    </div>
+                  </div>
+                ) : posts.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-gray-400">No posts yet</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    {posts.map((post) => (
+                      <motion.div
+                        key={post.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="relative aspect-square rounded-xl overflow-hidden bg-[#2f2f2f]"
+                      >
+                        <img
+                          src={post.imageUrl}
+                          alt={post.caption}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                          <p className="text-sm text-white">
+                            {post.likes?.length || 0} HEHEs
+                          </p>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
-                {posts.map((post) => (
-                  <motion.div
-                    key={post.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="relative aspect-square rounded-xl overflow-hidden bg-[#2f2f2f]"
-                  >
-                    <img
-                      src={post.imageUrl}
-                      alt={post.caption}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-                      <p className="text-sm text-white">
-                        {post.likes?.length || 0} HEHEs
+              <>
+                {isLoadingNFTs ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="space-y-4 text-center">
+                      <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                      <p className="text-white">Loading NFTs...</p>
+                      {balance && (
+                        <p className="text-gray-400">Loading NFT {currentNftIndex + 1} of {balance.toString()}</p>
+                      )}
+                    </div>
+                  </div>
+                ) : nfts.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="space-y-2">
+                      <ImageIcon className="w-12 h-12 text-gray-400 mx-auto" />
+                      <p className="text-gray-400">No NFTs found</p>
+                      <p className="text-sm text-gray-500">
+                        Start minting some memes to see them here!
                       </p>
                     </div>
-                  </motion.div>
-                ))}
-              </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {nfts.map((nft) => (
+                      <motion.div
+                        key={nft.tokenId}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-[#2f2f2f] rounded-lg overflow-hidden"
+                      >
+                        <div className="aspect-square relative">
+                          <img
+                            src={nft.imageUrl}
+                            alt={`NFT #${nft.tokenId}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="p-4">
+                          <p className="text-white font-medium">NFT #{nft.tokenId}</p>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
       </div>
-    </AuthWrapper>
   )
 }
