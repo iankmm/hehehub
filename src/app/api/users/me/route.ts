@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { verifyJwtToken } from '../../../../lib/jwt'
+import { supabase } from '@/lib/supabase-admin'
+import { verifyJwtToken } from '@/lib/jwt'
 
 const verifyAuth = (token: string) => {
   try {
@@ -24,17 +24,18 @@ export async function GET(request: Request) {
     }
 
     // Get user data including their heheScore
-    const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      select: {
-        id: true,
-        username: true,
-        address: true,
-        heheScore: true,
-      },
-    })
+    const { data: user, error } = await supabase
+      .from('User')
+      .select(`
+        id,
+        username,
+        address,
+        heheScore
+      `)
+      .eq('id', payload.userId)
+      .single()
 
-    if (!user) {
+    if (error || !user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 

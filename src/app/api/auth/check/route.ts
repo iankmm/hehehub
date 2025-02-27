@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase-admin'
 import jwt from 'jsonwebtoken'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
@@ -16,9 +16,11 @@ export async function POST(request: Request) {
     }
 
     // Find existing user by address
-    const existingUser = await prisma.user.findUnique({
-      where: { address: address.toLowerCase() }
-    })
+    const { data: existingUser, error } = await supabase
+      .from('User')
+      .select()
+      .eq('address', address.toLowerCase())
+      .single()
 
     if (existingUser) {
       const token = jwt.sign({ userId: existingUser.id }, JWT_SECRET)

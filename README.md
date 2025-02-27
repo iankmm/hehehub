@@ -8,7 +8,7 @@ A TikTok-style meme sharing platform built with Next.js, where users can scroll 
 
 ## potential bounties
 - track: impact + public goods
-- maybe ai agent on eigenlayer?
+- maybe ai agent on eigenlayer
 
 
 

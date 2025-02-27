@@ -1,59 +1,66 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import jwt from 'jsonwebtoken'
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
+import { supabase } from '@/lib/supabase-admin'
+import { createJwtToken } from '@/lib/jwt'
+import { v4 as uuidv4 } from 'uuid'
 
 export async function POST(request: Request) {
   try {
-    const { address, username } = await request.json()
+    const { username, address } = await request.json()
 
-    if (!address || !username) {
-      return NextResponse.json(
-        { error: 'Address and username are required' },
-        { status: 400 }
-      )
+    // Validate input
+    if (!username || !address) {
+      return NextResponse.json({ message: 'Username and address are required' }, { status: 400 })
     }
 
-    // Check if username already exists
-    const userWithUsername = await prisma.user.findUnique({
-      where: { username }
-    })
-
-    if (userWithUsername) {
-      return NextResponse.json(
-        { error: 'Username already taken' },
-        { status: 400 }
-      )
-    }
-
-    // Check if user with this address already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { address: address.toLowerCase() }
-    })
+    // Check if username is already taken
+    const { data: existingUser, error: checkError } = await supabase
+      .from('User')
+      .select()
+      .eq('username', username)
+      .single()
 
     if (existingUser) {
-      return NextResponse.json(
-        { error: 'User already exists' },
-        { status: 400 }
-      )
+      return NextResponse.json({ message: 'Username is already taken' }, { status: 400 })
     }
 
     // Create new user
-    const newUser = await prisma.user.create({
-      data: {
+    const userId = uuidv4()
+    const { data: user, error: createError } = await supabase
+      .from('User')
+      .insert({
+        id: userId,
+        username,
         address: address.toLowerCase(),
-        username
-      }
+        heheScore: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      })
+      .select()
+      .single()
+
+    if (createError) {
+      console.error('User creation error:', createError)
+      return NextResponse.json({ message: 'Error creating user' }, { status: 500 })
+    }
+
+    // Generate JWT token
+    const token = createJwtToken({
+      id: user.id,
+      username: user.username,
+      address: user.address
     })
 
-    const token = jwt.sign({ userId: newUser.id }, JWT_SECRET)
-    return NextResponse.json({ token, user: newUser })
+    return NextResponse.json({
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        address: user.address,
+        heheScore: user.heheScore
+      }
+    })
   } catch (error) {
     console.error('Signup error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ message: 'Internal server error' }, { status: 500 })
   }
 }
