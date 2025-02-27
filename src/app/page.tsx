@@ -152,9 +152,8 @@ export default function Home() {
         {showCreatePost && (
           <CreatePost
             onClose={() => setShowCreatePost(false)}
-            onSuccess={() => {
-              setShowCreatePost(false);
-              fetchPosts(1);
+            onPostCreated={(newPost) => {
+              setPosts([newPost, ...posts]);
             }}
           />
         )}

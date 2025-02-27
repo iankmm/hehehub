@@ -7,9 +7,19 @@ import { X, Upload, Image as ImageIcon } from 'lucide-react'
 interface CreatePostProps {
   isOpen: boolean
   setIsOpen: (isOpen: boolean) => void
+  onPostCreated?: (post: {
+    id: string
+    imageUrl: string
+    caption: string
+    likes: number
+    username: string
+    heheScore: number
+    hasLiked: boolean
+    createdAt: string
+  }) => void
 }
 
-export default function CreatePost({ isOpen, setIsOpen }: CreatePostProps) {
+export default function CreatePost({ isOpen, setIsOpen, onPostCreated }: CreatePostProps) {
   const [caption, setCaption] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -53,6 +63,9 @@ export default function CreatePost({ isOpen, setIsOpen }: CreatePostProps) {
 
       const uploadRes = await fetch('/api/upload', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: formData,
       })
 
@@ -87,8 +100,10 @@ export default function CreatePost({ isOpen, setIsOpen }: CreatePostProps) {
       setCaption('')
       setIsOpen(false)
 
-      // Refresh the feed
-      window.location.reload()
+      // Call the callback instead of reloading
+      if (onPostCreated) {
+        onPostCreated(data)
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Something went wrong')
     } finally {
