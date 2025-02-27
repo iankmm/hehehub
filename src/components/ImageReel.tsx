@@ -7,6 +7,7 @@ import { createThirdwebClient, getContract, sendTransaction, prepareContractCall
 import { baseSepolia } from "thirdweb/chains";
 import { useActiveAccount, useActiveWalletConnectionStatus, useReadContract } from "thirdweb/react";
 import HeheMemeABI from '@/contracts/HeheMeme.json';
+import { Check } from 'lucide-react';
 
 const client = createThirdwebClient({
   clientId: "8e1035b064454b1b9505e0dd626a8555"
@@ -403,14 +404,26 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
               <AnimatePresence>
                 {showMintSuccess && (
                   <motion.div
-                    initial={{ opacity: 0, y: 50 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 50 }}
-                    className="fixed bottom-20 left-1/2 transform -translate-x-1/2 
-                     bg-green-500 text-white px-6 py-3 rounded-lg shadow-xl 
-                     flex items-center space-x-2 z-50 text-lg font-medium"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="fixed inset-0 flex items-center justify-center z-50 bg-black/50 backdrop-blur-sm"
                   >
-                    <span>✨ Successfully minted!</span>
+                    <div className="bg-[#2f2f2f] rounded-2xl p-8 shadow-xl max-w-sm w-full mx-4">
+                      <div className="flex flex-col items-center text-center space-y-4">
+                        <div className="w-16 h-16 bg-pink-500 rounded-full flex items-center justify-center">
+                          <Check className="w-8 h-8 text-white" />
+                        </div>
+                        <h3 className="text-2xl font-bold text-white">Successfully minted!</h3>
+                        <p className="text-gray-400">Your meme has been minted as an NFT. View it in your profile.</p>
+                        <button
+                          onClick={() => setShowMintSuccess(false)}
+                          className="mt-6 w-full bg-pink-500 text-white py-3 px-6 rounded-lg font-medium hover:bg-pink-600 transition-colors"
+                        >
+                          Continue
+                        </button>
+                      </div>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
