@@ -62,6 +62,11 @@ export async function GET(request: Request) {
           },
           take: 1,
         },
+        _count: {
+          select: {
+            likes: true
+          }
+        }
       },
     })
 
@@ -70,7 +75,7 @@ export async function GET(request: Request) {
       id: post.id,
       imageUrl: post.imageUrl,
       caption: post.caption,
-      likes: post._count?.likes || 0,
+      likes: post._count.likes,
       username: post.user.username,
       heheScore: post.user.heheScore,
       hasLiked: post.likes.length > 0,

@@ -37,7 +37,7 @@ const configuredBaseSepolia = {
 }
 
 // Configure chains
-const chains = [configuredZkSync, configuredBaseSepolia]
+const chains = [configuredBaseSepolia]
 
 // Create wagmi config
 const config = defaultWagmiConfig({
@@ -46,11 +46,13 @@ const config = defaultWagmiConfig({
   metadata,
   ssr: true,
   transports: {
-    [configuredZkSync.id]: http(zkSyncRpcUrl),
     [configuredBaseSepolia.id]: http(baseSepoliaRpcUrl),
   },
   connectors: [
-    injected(),
+    injected({
+      target: 'metaMask',
+      shimDisconnect: true,
+    }),
   ],
 })
 

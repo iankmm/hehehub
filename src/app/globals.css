@@ -14,6 +14,20 @@
   --background-end-rgb: 0, 0, 0;
 }
 
+/* Enable smooth scrolling and touch scrolling */
+html, body {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Ensure content is scrollable */
+#__next {
+  height: 100%;
+  overflow: hidden;
+}
+
 @keyframes gradient {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
@@ -71,7 +85,7 @@
 
 body {
   color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-start-rgb));
+  background: #1f1f1f;
   overflow: hidden;
   overscroll-behavior: none;
   touch-action: none;

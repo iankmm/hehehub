@@ -2,6 +2,16 @@
 
 A TikTok-style meme sharing platform built with Next.js, where users can scroll through memes, like them with "hehe" reactions, and share their own memes.
 
+## TODO
+- ethstorage for posts
+-
+
+## potential bounties
+- track: impact + public goods
+- maybe ai agent on eigenlayer?
+
+
+
 ## Complete Setup Guide
 
 ### 1. Prerequisites

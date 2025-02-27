@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase-admin'
 import jwt from 'jsonwebtoken'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
@@ -16,16 +16,20 @@ export async function POST(request: Request) {
     }
 
     // Find existing user by address
-    const existingUser = await prisma.user.findUnique({
-      where: { address: address.toLowerCase() }
-    })
+    const { data: existingUser } = await supabase
+      .from('User')
+      .select()
+      .eq('address', address.toLowerCase())
+      .single()
 
     // If username is provided, this is a signup request
     if (username) {
       // Check if username already exists
-      const userWithUsername = await prisma.user.findUnique({
-        where: { username }
-      })
+      const { data: userWithUsername } = await supabase
+        .from('User')
+        .select()
+        .eq('username', username)
+        .single()
 
       if (userWithUsername) {
         return NextResponse.json(
@@ -36,12 +40,19 @@ export async function POST(request: Request) {
 
       // Create new user if they don't exist
       if (!existingUser) {
-        const newUser = await prisma.user.create({
-          data: {
+        const { data: newUser, error } = await supabase
+          .from('User')
+          .insert({
             address: address.toLowerCase(),
-            username
-          }
-        })
+            username,
+            heheScore: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          })
+          .select()
+          .single()
+
+        if (error) throw error
 
         const token = jwt.sign({ userId: newUser.id }, JWT_SECRET)
         return NextResponse.json({ token, user: newUser })

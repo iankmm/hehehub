@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { verifyJwtToken } from '../../../../../lib/jwt';
-import { prisma } from '../../../../../lib/prisma';
+import { verifyJwtToken } from '@/lib/jwt';
+import { supabase } from '@/lib/supabase-admin';
 
 const verifyAuth = (token: string) => {
   try {
@@ -27,61 +27,56 @@ export async function POST(
 
     const postId = params.id
 
-    // Create like and update heheScores in a transaction
-    const result = await prisma.$transaction(async (prisma) => {
-      // Get the post with its author
-      const post = await prisma.post.findUnique({
-        where: { id: postId },
-        include: { user: true }
-      })
+    // Get the post with its author
+    const { data: post, error: postError } = await supabase
+      .from('Post')
+      .select('*, user:User(*)')
+      .eq('id', postId)
+      .single()
 
-      if (!post) {
-        throw new Error('Post not found')
-      }
-
-      // Create the like
-      const like = await prisma.like.create({
-        data: {
-          postId,
-          userId: payload.userId,
-        },
-      })
-
-      // Update liker's heheScore (person who liked gets 1 point)
-      const liker = await prisma.user.update({
-        where: { id: payload.userId },
-        data: {
-          heheScore: {
-            increment: 1,
-          },
-        },
-      })
-
-      // Update post author's heheScore (post creator gets 1 point)
-      const author = await prisma.user.update({
-        where: { id: post.userId },
-        data: {
-          heheScore: {
-            increment: 1,
-          },
-        },
-      })
-
-      return { 
-        like,
-        likerScore: liker.heheScore,
-        authorScore: author.heheScore
-      }
-    })
-
-    return NextResponse.json(result)
-  } catch (error: any) {
-    if (error.code === 'P2002') {
-      return NextResponse.json(
-        { error: 'Already liked this post' },
-        { status: 400 }
-      )
+    if (postError || !post) {
+      return NextResponse.json({ error: 'Post not found' }, { status: 404 })
     }
+
+    // Create like
+    const { data: like, error: likeError } = await supabase
+      .from('Like')
+      .insert({
+        postId,
+        userId: payload.userId,
+        createdAt: new Date().toISOString()
+      })
+      .select()
+      .single()
+
+    if (likeError) {
+      if (likeError.code === '23505') { // Unique constraint violation
+        return NextResponse.json(
+          { error: 'Already liked this post' },
+          { status: 400 }
+        )
+      }
+      throw likeError
+    }
+
+    // Update liker's heheScore
+    const { data: liker, error: likerError } = await supabase.rpc('increment_hehe_score', {
+      user_id: payload.userId
+    })
+    if (likerError) throw likerError
+
+    // Update post author's heheScore
+    const { data: author, error: authorError } = await supabase.rpc('increment_hehe_score', {
+      user_id: post.userId
+    })
+    if (authorError) throw authorError
+
+    return NextResponse.json({
+      like,
+      likerScore: liker.hehe_score,
+      authorScore: author.hehe_score
+    })
+  } catch (error) {
     console.error('Like error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
@@ -107,56 +102,44 @@ export async function DELETE(
 
     const postId = params.id
 
-    // Delete like and update heheScores in a transaction
-    const result = await prisma.$transaction(async (prisma) => {
-      // Get the post with its author
-      const post = await prisma.post.findUnique({
-        where: { id: postId },
-        include: { user: true }
-      })
+    // Get the post with its author
+    const { data: post, error: postError } = await supabase
+      .from('Post')
+      .select('*, user:User(*)')
+      .eq('id', postId)
+      .single()
 
-      if (!post) {
-        throw new Error('Post not found')
-      }
+    if (postError || !post) {
+      return NextResponse.json({ error: 'Post not found' }, { status: 404 })
+    }
 
-      // Delete the like
-      const like = await prisma.like.delete({
-        where: {
-          postId_userId: {
-            postId,
-            userId: payload.userId,
-          },
-        },
-      })
+    // Delete like
+    const { data: like, error: likeError } = await supabase
+      .from('Like')
+      .delete()
+      .match({ postId, userId: payload.userId })
+      .select()
+      .single()
 
-      // Update liker's heheScore (person who unliked loses 1 point)
-      const liker = await prisma.user.update({
-        where: { id: payload.userId },
-        data: {
-          heheScore: {
-            decrement: 1,
-          },
-        },
-      })
+    if (likeError) throw likeError
 
-      // Update post author's heheScore (post creator loses 1 point)
-      const author = await prisma.user.update({
-        where: { id: post.userId },
-        data: {
-          heheScore: {
-            decrement: 1,
-          },
-        },
-      })
-
-      return {
-        like,
-        likerScore: liker.heheScore,
-        authorScore: author.heheScore
-      }
+    // Update liker's heheScore
+    const { data: liker, error: likerError } = await supabase.rpc('decrement_hehe_score', {
+      user_id: payload.userId
     })
+    if (likerError) throw likerError
 
-    return NextResponse.json(result)
+    // Update post author's heheScore
+    const { data: author, error: authorError } = await supabase.rpc('decrement_hehe_score', {
+      user_id: post.userId
+    })
+    if (authorError) throw authorError
+
+    return NextResponse.json({
+      like,
+      likerScore: liker.hehe_score,
+      authorScore: author.hehe_score
+    })
   } catch (error) {
     console.error('Unlike error:', error)
     return NextResponse.json(

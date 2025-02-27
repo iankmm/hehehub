@@ -37,22 +37,29 @@ interface NFT {
 }
 
 export default function NFTsPage() {
-  const { address, isConnected } = useAccount()
+  const { address, isConnected, status } = useAccount()
   const [nfts, setNfts] = useState<NFT[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchNFTs = async () => {
-      if (!address) {
+      if (!address || !isConnected || status !== 'connected') {
         setNfts([])
         setLoading(false)
         return
       }
 
+      setError(null)
       try {
+        const contractAddress = process.env.NEXT_PUBLIC_HEHEMEME_CONTRACT_ADDRESS
+        if (!contractAddress) {
+          throw new Error('Contract address not configured')
+        }
+
         // Get user's NFT balance
         const balance = await readContract(getConfig(), {
-          address: process.env.NEXT_PUBLIC_HEHEMEME_CONTRACT_ADDRESS as `0x${string}`,
+          address: contractAddress as `0x${string}`,
           abi: HeheMemeABI,
           functionName: 'balanceOf',
           args: [address],
@@ -65,7 +72,7 @@ export default function NFTsPage() {
           try {
             // Get tokenId at index
             const tokenId = await readContract(getConfig(), {
-              address: process.env.NEXT_PUBLIC_HEHEMEME_CONTRACT_ADDRESS as `0x${string}`,
+              address: contractAddress as `0x${string}`,
               abi: HeheMemeABI,
               functionName: 'tokenOfOwnerByIndex',
               args: [address, BigInt(i)],
@@ -75,7 +82,7 @@ export default function NFTsPage() {
 
             // Get meme URL for this token
             const memeUrl = await readContract(getConfig(), {
-              address: process.env.NEXT_PUBLIC_HEHEMEME_CONTRACT_ADDRESS as `0x${string}`,
+              address: contractAddress as `0x${string}`,
               abi: HeheMemeABI,
               functionName: 'getMemeUrl',
               args: [tokenId],
@@ -98,64 +105,87 @@ export default function NFTsPage() {
         setNfts(nftResults)
       } catch (error) {
         console.error('Error fetching NFTs:', error)
+        setError('Failed to fetch NFTs. Please try again later.')
       } finally {
         setLoading(false)
       }
     }
 
     fetchNFTs()
-  }, [address])
+  }, [address, isConnected, status])
 
-  if (!isConnected) {
+  // Show loading state
+  if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-[#1f1f1f]">
-        <h1 className="text-2xl font-bold mb-4 text-white">Connect Your Wallet</h1>
-        <p className="text-[#898989] text-center">
-          Connect your wallet to view your minted NFTs
-        </p>
+      <div className="min-h-screen bg-[#1f1f1f] flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-white">Loading your NFTs...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#1f1f1f] flex items-center justify-center p-4">
+        <div className="text-center space-y-4">
+          <p className="text-red-500">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#1f1f1f]">
+    <main className="fixed inset-0 bg-[#1f1f1f] overflow-hidden">
       {/* Fixed Header */}
-      <div className="fixed top-0 left-0 right-0 z-10 bg-[#1f1f1f] p-4 border-b border-[#2f2f2f]">
+      <header className="absolute top-0 left-0 right-0 z-10 bg-[#1f1f1f] p-4 border-b border-[#2f2f2f]">
         <h1 className="text-2xl font-bold text-white">Your Minted NFTs</h1>
-      </div>
+      </header>
 
       {/* Scrollable Content */}
-      <div className="pt-20 pb-24 px-4">
-        {loading ? (
-          <div className="flex justify-center items-center min-h-[200px]">
-            <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : nfts.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-[#898989]">No NFTs minted yet</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-4">
-            {nfts.map((nft) => (
-              <motion.div
-                key={nft.tokenId}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="relative aspect-square rounded-xl overflow-hidden bg-[#2f2f2f]"
-              >
-                <img
-                  src={nft.imageUrl}
-                  alt={`NFT #${nft.tokenId}`}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#1f1f1f]/80 to-transparent p-2">
-                  <p className="text-sm font-medium text-white">#{nft.tokenId}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        )}
+      <div 
+        className="absolute inset-0 top-[73px] bottom-[80px] overflow-y-auto overscroll-contain touch-pan-y"
+        style={{
+          WebkitOverflowScrolling: 'touch',
+          height: 'calc(100vh - 153px)', // Account for header and bottom nav
+        }}
+      >
+        <div className="p-4">
+          {nfts.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-[#898989]">No NFTs minted yet</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 pb-4">
+              {nfts.map((nft) => (
+                <motion.div
+                  key={nft.tokenId}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="relative aspect-square rounded-xl overflow-hidden bg-[#2f2f2f]"
+                >
+                  <img
+                    src={nft.imageUrl}
+                    alt={`NFT #${nft.tokenId}`}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#1f1f1f]/80 to-transparent p-2">
+                    <p className="text-sm font-medium text-white">#{nft.tokenId}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </main>
   )
 }

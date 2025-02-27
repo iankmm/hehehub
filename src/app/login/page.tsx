@@ -16,18 +16,12 @@ export default function LoginPage() {
   const { address, isConnected } = useAccount()
   const { open } = useWeb3Modal()
   const router = useRouter()
+  const [username, setUsername] = useState('')
+  const [showUsernameForm, setShowUsernameForm] = useState(false)
 
-  // Check for existing token and redirect if already logged in
-  useEffect(() => {
-    const token = localStorage.getItem('token')
-    const user = localStorage.getItem('user')
-    if (token && user && isConnected) {
-      router.push('/')
-    }
-  }, [router, isConnected])
-
-  // Handle wallet connection and authentication
+  // Handle wallet connection
   const handleConnect = async () => {
+    if (isAuthenticating) return
     try {
       await open()
     } catch (error) {
@@ -37,12 +31,18 @@ export default function LoginPage() {
 
   // Handle authentication after wallet connection
   useEffect(() => {
-    const authenticate = async () => {
-      if (!isConnected || !address || isAuthenticating) return
+    let mounted = true
 
+    const authenticate = async () => {
+      // Prevent multiple simultaneous auth attempts
+      if (isAuthenticating || !isConnected || !address) return
+
+      console.log('Starting authentication with address:', address)
       setIsAuthenticating(true)
+
       try {
-        const res = await fetch('/api/auth', {
+        // First check if user exists
+        const checkRes = await fetch('/api/auth/check', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -50,101 +50,130 @@ export default function LoginPage() {
           body: JSON.stringify({ address }),
         })
 
-        const data = await res.json()
+        // Only proceed if component is still mounted
+        if (!mounted) return
 
-        if (data.needsUsername) {
-          router.push('/signup')
-          return
-        }
-
-        if (data.token && data.user && typeof data.user === 'object') {
+        if (checkRes.ok) {
+          const data = await checkRes.json()
           localStorage.setItem('token', data.token)
           localStorage.setItem('user', JSON.stringify(data.user))
+          // Add a small delay to ensure storage is updated
+          await new Promise(resolve => setTimeout(resolve, 100))
           router.push('/')
         } else {
-          throw new Error('Invalid response data format')
+          // User doesn't exist, show username form
+          setShowUsernameForm(true)
         }
       } catch (error) {
         console.error('Authentication error:', error)
-        setIsAuthenticating(false)
+        if (mounted) {
+          setShowUsernameForm(false)
+        }
+      } finally {
+        if (mounted) {
+          setIsAuthenticating(false)
+        }
       }
     }
 
-    authenticate()
-  }, [isConnected, address, router])
+    // Only attempt authentication if wallet is connected and we're not already authenticating
+    if (isConnected && address && !isAuthenticating && !showUsernameForm) {
+      // Add a small delay to ensure wallet is fully initialized
+      setTimeout(authenticate, 500)
+    }
+
+    return () => {
+      mounted = false
+    }
+  }, [address, isConnected, router])
+
+  const handleSubmitUsername = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!address || !username.trim() || isAuthenticating) return
+
+    setIsAuthenticating(true)
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ address, username }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        localStorage.setItem('token', data.token)
+        localStorage.setItem('user', JSON.stringify(data.user))
+        router.push('/')
+      } else {
+        const errorData = await res.json()
+        console.error('Username submission error:', errorData)
+      }
+    } catch (error) {
+      console.error('Username submission error:', error)
+    } finally {
+      setIsAuthenticating(false)
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-[#1f1f1f] flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-8">
-        {/* Logo and Title */}
-        <div className="flex flex-col items-center space-y-4">
-          <div className="bg-[#2f2f2f] p-4 rounded-full">
-            <Laugh className="w-12 h-12 text-blue-400" />
-          </div>
-          <div className="text-center">
-            <h1 className="text-3xl font-bold text-white">Welcome to HEHE</h1>
-            <p className="mt-2 text-[#898989]">Share and discover the funniest memes in web3</p>
-          </div>
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
+      <div className="max-w-md w-full space-y-8">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold text-white mb-2 flex items-center justify-center gap-2">
+            <Laugh className="w-10 h-10" />
+            HeheMeme
+          </h1>
+          <p className="text-gray-400 text-lg mb-8">Create and collect meme NFTs</p>
         </div>
 
-        {/* Features */}
-        <div className="bg-[#2f2f2f] rounded-lg p-6 space-y-4">
-          <div className="flex items-center space-x-3 text-white">
-            <div className="bg-blue-400/10 p-2 rounded-lg">
-              <Laugh className="w-5 h-5 text-blue-400" />
-            </div>
-            <div>
-              <h3 className="font-medium">Share Your Humor</h3>
-              <p className="text-sm text-[#898989]">Post and share your favorite memes</p>
-            </div>
+        {showUsernameForm ? (
+          <form onSubmit={handleSubmitUsername} className="space-y-4">
+            <input
+              type="text"
+              placeholder="Choose a username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full px-4 py-2 rounded bg-gray-800 text-white border border-gray-700 focus:outline-none focus:border-pink-500"
+              disabled={isAuthenticating}
+            />
+            <button
+              type="submit"
+              className="w-full bg-pink-500 text-white py-2 px-4 rounded hover:bg-pink-600 transition-colors disabled:opacity-50"
+              disabled={isAuthenticating || !username.trim()}
+            >
+              {isAuthenticating ? 'Setting up...' : 'Continue'}
+            </button>
+          </form>
+        ) : (
+          <button
+            onClick={handleConnect}
+            className="w-full bg-pink-500 text-white py-3 px-4 rounded-lg hover:bg-pink-600 transition-colors flex items-center justify-center gap-2 text-lg"
+            disabled={isAuthenticating}
+          >
+            <WalletIcon className="w-6 h-6" />
+            {isAuthenticating ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                Connecting...
+              </>
+            ) : (
+              'Connect Wallet'
+            )}
+          </button>
+        )}
+
+        <div className="space-y-4 mt-12">
+          <div className="flex items-center gap-3 text-gray-400">
+            <Trophy className="w-6 h-6" />
+            <span>Earn points by creating viral memes</span>
           </div>
-          <div className="flex items-center space-x-3 text-white">
-            <div className="bg-purple-400/10 p-2 rounded-lg">
-              <MessageCircle className="w-5 h-5 text-purple-400" />
-            </div>
-            <div>
-              <h3 className="font-medium">Connect with Others</h3>
-              <p className="text-sm text-[#898989]">Engage with a community of meme lovers</p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-3 text-white">
-            <div className="bg-green-400/10 p-2 rounded-lg">
-              <Trophy className="w-5 h-5 text-green-400" />
-            </div>
-            <div>
-              <h3 className="font-medium">Earn HEHE Score</h3>
-              <p className="text-sm text-[#898989]">Get rewarded for your contributions</p>
-            </div>
+          <div className="flex items-center gap-3 text-gray-400">
+            <MessageCircle className="w-6 h-6" />
+            <span>Join the meme community</span>
           </div>
         </div>
-
-        {/* Connect Button */}
-        <button
-          onClick={handleConnect}
-          disabled={isAuthenticating}
-          className="w-full bg-[#2f2f2f] text-white py-3 px-4 rounded-lg
-            border border-[#3f3f3f] hover:bg-[#2a2a2a] transition-colors
-            flex items-center justify-center space-x-2 disabled:opacity-50"
-        >
-          {isAuthenticating ? (
-            <>
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              <span>Connecting...</span>
-            </>
-          ) : isConnected ? (
-            <>
-              <div className="w-5 h-5 border-2 border-green-400 rounded-full flex items-center justify-center">
-                <div className="w-3 h-3 bg-green-400 rounded-full" />
-              </div>
-              <span>Wallet Connected - Authenticating...</span>
-            </>
-          ) : (
-            <>
-              <WalletIcon className="w-5 h-5" />
-              <span>Connect Wallet to Start</span>
-            </>
-          )}
-        </button>
       </div>
     </div>
   )
