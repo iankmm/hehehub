@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Upload, Image as ImageIcon } from 'lucide-react'
-
+import { AutoConnect } from "thirdweb/react";
 interface CreatePostProps {
   isOpen: boolean
   setIsOpen: (isOpen: boolean) => void

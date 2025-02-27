@@ -1,35 +1,20 @@
 'use client'
 
-import { useAccount } from 'wagmi'
-import { readContract } from '@wagmi/core'
 import { useEffect, useState } from 'react'
-import { getConfig } from '@/lib/wagmi'
 import { motion } from 'framer-motion'
+import { createThirdwebClient, getContract } from "thirdweb"
+import { baseSepolia } from "thirdweb/chains"
+import { useActiveAccount, useReadContract } from "thirdweb/react"
 
-// Import the ABI directly to ensure we have the latest version
-const HeheMemeABI = [
-  {
-    "inputs": [{"internalType": "address","name": "owner","type": "address"}],
-    "name": "balanceOf",
-    "outputs": [{"internalType": "uint256","name": "","type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "address","name": "owner","type": "address"},{"internalType": "uint256","name": "index","type": "uint256"}],
-    "name": "tokenOfOwnerByIndex",
-    "outputs": [{"internalType": "uint256","name": "","type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256","name": "tokenId","type": "uint256"}],
-    "name": "getMemeUrl",
-    "outputs": [{"internalType": "string","name": "","type": "string"}],
-    "stateMutability": "view",
-    "type": "function"
-  }
-]
+const client = createThirdwebClient({
+  clientId: "8e1035b064454b1b9505e0dd626a8555"
+});
+
+const contract = getContract({
+  client,
+  address: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "",
+  chain: baseSepolia,
+});
 
 interface NFT {
   tokenId: string
@@ -37,90 +22,81 @@ interface NFT {
 }
 
 export default function NFTsPage() {
-  const { address, isConnected, status } = useAccount()
+  const activeAccount = useActiveAccount()
   const [nfts, setNfts] = useState<NFT[]>([])
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [currentIndex, setCurrentIndex] = useState<number>(0)
+  const [isLoadingNFTs, setIsLoadingNFTs] = useState(true)
 
+  // Get user's NFT balance
+  const { data: balance, isLoading: isLoadingBalance } = useReadContract({
+    contract,
+    method: "function balanceOf(address owner) view returns (uint256)",
+    params: activeAccount ? [activeAccount.address] : undefined,
+  })
+
+  // Get token ID for current index
+  const { data: tokenId, isLoading: isLoadingTokenId } = useReadContract({
+    contract,
+    method: "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
+    params: activeAccount ? [activeAccount.address, BigInt(currentIndex)] : undefined,
+  })
+
+  // Get meme URL for token ID
+  const { data: memeUrl, isLoading: isLoadingMemeUrl } = useReadContract({
+    contract,
+    method: "function getMemeUrl(uint256 tokenId) view returns (string)",
+    params: tokenId ? [tokenId] : undefined,
+  })
+
+  // Effect for balance loading
   useEffect(() => {
-    const fetchNFTs = async () => {
-      if (!address || !isConnected || status !== 'connected') {
-        setNfts([])
-        setLoading(false)
-        return
-      }
-
-      setError(null)
-      try {
-        const contractAddress = process.env.NEXT_PUBLIC_HEHEMEME_CONTRACT_ADDRESS
-        if (!contractAddress) {
-          throw new Error('Contract address not configured')
-        }
-
-        // Get user's NFT balance
-        const balance = await readContract(getConfig(), {
-          address: contractAddress as `0x${string}`,
-          abi: HeheMemeABI,
-          functionName: 'balanceOf',
-          args: [address],
-        }) as bigint
-
-        console.log('NFT Balance:', balance.toString())
-
-        // Fetch all NFTs owned by user
-        const nftPromises = Array.from({ length: Number(balance) }, async (_, i) => {
-          try {
-            // Get tokenId at index
-            const tokenId = await readContract(getConfig(), {
-              address: contractAddress as `0x${string}`,
-              abi: HeheMemeABI,
-              functionName: 'tokenOfOwnerByIndex',
-              args: [address, BigInt(i)],
-            }) as bigint
-
-            console.log('Token ID at index', i, ':', tokenId.toString())
-
-            // Get meme URL for this token
-            const memeUrl = await readContract(getConfig(), {
-              address: contractAddress as `0x${string}`,
-              abi: HeheMemeABI,
-              functionName: 'getMemeUrl',
-              args: [tokenId],
-            }) as string
-
-            console.log('Meme URL for token', tokenId.toString(), ':', memeUrl)
-
-            return {
-              tokenId: tokenId.toString(),
-              imageUrl: memeUrl,
-            }
-          } catch (error) {
-            console.error('Error fetching NFT at index', i, ':', error)
-            return null
-          }
-        })
-
-        const nftResults = (await Promise.all(nftPromises)).filter((nft): nft is NFT => nft !== null)
-        console.log('Fetched NFTs:', nftResults)
-        setNfts(nftResults)
-      } catch (error) {
-        console.error('Error fetching NFTs:', error)
-        setError('Failed to fetch NFTs. Please try again later.')
-      } finally {
-        setLoading(false)
-      }
+    if (!activeAccount?.address) {
+      setNfts([])
+      setIsLoadingNFTs(false)
+      return
     }
 
-    fetchNFTs()
-  }, [address, isConnected, status])
+    if (!isLoadingBalance && !balance) {
+      setNfts([])
+      setIsLoadingNFTs(false)
+      return
+    }
+
+    setIsLoadingNFTs(true)
+  }, [activeAccount?.address, balance, isLoadingBalance])
+
+  // Effect for loading NFTs
+  useEffect(() => {
+    if (!balance || isLoadingBalance || currentIndex >= Number(balance)) {
+      return
+    }
+
+    if (!isLoadingTokenId && !isLoadingMemeUrl && tokenId && memeUrl) {
+      setNfts(prev => [...prev, {
+        tokenId: tokenId.toString(),
+        imageUrl: memeUrl
+      }])
+
+      // Move to next NFT or finish
+      if (currentIndex + 1 < Number(balance)) {
+        setCurrentIndex(currentIndex + 1)
+      } else {
+        setIsLoadingNFTs(false)
+      }
+    }
+  }, [balance, isLoadingBalance, currentIndex, tokenId, memeUrl, isLoadingTokenId, isLoadingMemeUrl])
 
   // Show loading state
-  if (loading) {
+  if (isLoadingBalance || isLoadingNFTs) {
     return (
       <div className="min-h-screen bg-[#1f1f1f] flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-white">Loading your NFTs...</p>
+          {balance && (
+            <p className="text-gray-400">Loading NFT {currentIndex + 1} of {balance.toString()}</p>
+          )}
         </div>
       </div>
     )
@@ -151,40 +127,37 @@ export default function NFTsPage() {
       </header>
 
       {/* Scrollable Content */}
-      <div 
-        className="absolute inset-0 top-[73px] bottom-[80px] overflow-y-auto overscroll-contain touch-pan-y"
-        style={{
-          WebkitOverflowScrolling: 'touch',
-          height: 'calc(100vh - 153px)', // Account for header and bottom nav
-        }}
-      >
-        <div className="p-4">
-          {nfts.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-[#898989]">No NFTs minted yet</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-4 pb-4">
-              {nfts.map((nft) => (
-                <motion.div
-                  key={nft.tokenId}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="relative aspect-square rounded-xl overflow-hidden bg-[#2f2f2f]"
-                >
+      <div className="absolute inset-0 mt-16 p-4 overflow-y-auto">
+        {nfts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center space-y-4">
+            <p className="text-gray-400">No NFTs found</p>
+            <p className="text-sm text-gray-500">
+              Start minting some memes to see them here!
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {nfts.map((nft) => (
+              <motion.div
+                key={nft.tokenId}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-[#2f2f2f] rounded-lg overflow-hidden"
+              >
+                <div className="aspect-square relative">
                   <img
                     src={nft.imageUrl}
                     alt={`NFT #${nft.tokenId}`}
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#1f1f1f]/80 to-transparent p-2">
-                    <p className="text-sm font-medium text-white">#{nft.tokenId}</p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </div>
+                </div>
+                <div className="p-4">
+                  <p className="text-white font-medium">NFT #{nft.tokenId}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
       </div>
     </main>
   )

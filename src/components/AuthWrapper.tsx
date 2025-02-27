@@ -1,17 +1,16 @@
 'use client'
 
-import { useAccount, useConnect } from 'wagmi'
 import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { injected } from 'wagmi/connectors'
+import { useActiveAccount, useActiveWalletConnectionStatus } from "thirdweb/react"
 
 export default function AuthWrapper({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const { status, address, isConnected } = useAccount()
-  const { connect } = useConnect()
+  const activeAccount = useActiveAccount()
+  const connectionStatus = useActiveWalletConnectionStatus()
   const router = useRouter()
   const pathname = usePathname()
   const isSignInPage = pathname === '/login'
@@ -21,26 +20,13 @@ export default function AuthWrapper({
   // Handle wallet initialization
   useEffect(() => {
     const initializeWallet = async () => {
-      // Wait a bit longer to ensure wagmi is fully initialized
+      // Wait a bit longer to ensure thirdweb is fully initialized
       await new Promise(resolve => setTimeout(resolve, 1500))
-      
-      // If we have a stored user but not connected, try to reconnect
-      const user = localStorage.getItem('user')
-      if (user && !isConnected && status !== 'connected') {
-        try {
-          await connect({ connector: injected() })
-          // Add delay after connection
-          await new Promise(resolve => setTimeout(resolve, 500))
-        } catch (error) {
-          console.error('Error reconnecting wallet:', error)
-        }
-      }
-      
       setIsInitialized(true)
     }
 
     initializeWallet()
-  }, [isConnected, status, connect])
+  }, [])
 
   // Handle initial auth check and token validation
   useEffect(() => {
@@ -56,42 +42,30 @@ export default function AuthWrapper({
       const user = localStorage.getItem('user')
 
       console.log('Auth Check:', {
-        isConnected,
-        status,
+        isConnected: connectionStatus === 'connected',
+        connectionStatus,
         hasToken: !!token,
         hasUser: !!user,
         path: pathname,
         isSignInPage,
         isInitialized,
-        address
+        address: activeAccount?.address
       })
       
       // If wallet is still initializing or connecting, wait
-      if (status === 'connecting' || status === 'reconnecting') {
+      if (connectionStatus === 'connecting' || connectionStatus === 'reconnecting') {
         return
       }
 
       // Handle non-login pages
       if (!isSignInPage) {
-        // If we have stored credentials but wallet is not connected, try to reconnect
-        if (token && user && !isConnected && status !== 'connected') {
-          try {
-            await connect({ connector: injected() })
-            // Add delay after connection
-            await new Promise(resolve => setTimeout(resolve, 500))
-            return // Wait for next check after connection attempt
-          } catch (error) {
-            console.error('Error reconnecting wallet:', error)
-          }
-        }
-
-        if (!isConnected || !token || !user) {
+        if (connectionStatus !== 'connected' || !token || !user) {
           router.push('/login')
           return
         }
 
         // Validate token by checking wallet connection
-        if (!isConnected || !address) {
+        if (connectionStatus !== 'connected' || !activeAccount?.address) {
           localStorage.removeItem('token')
           localStorage.removeItem('user')
           router.push('/login')
@@ -100,8 +74,9 @@ export default function AuthWrapper({
 
         // Verify the stored user matches the connected wallet
         try {
-          const storedUser = user ? JSON.parse(user) : null
-          if (!storedUser || storedUser.address.toLowerCase() !== address.toLowerCase()) {
+          const storedUser = JSON.parse(user)
+          if (storedUser.address.toLowerCase() !== activeAccount.address.toLowerCase()) {
+            console.log('Stored user does not match connected wallet')
             localStorage.removeItem('token')
             localStorage.removeItem('user')
             router.push('/login')
@@ -115,27 +90,13 @@ export default function AuthWrapper({
           return
         }
       }
-      // Handle login page
-      else {
-        if (isConnected && token && user) {
-          try {
-            const storedUser = JSON.parse(user)
-            if (storedUser.address.toLowerCase() === address.toLowerCase()) {
-              router.push('/')
-              return
-            }
-          } catch (error) {
-            console.error('Error parsing stored user:', error)
-          }
-        }
-      }
     }
 
-    // Run initial check
+    // Perform initial check
     checkAuthState()
 
-    // Set up interval to periodically check auth state
-    checkInterval = setInterval(checkAuthState, 2000)
+    // Set up periodic checks
+    checkInterval = setInterval(checkAuthState, 3000)
 
     return () => {
       isMounted = false
@@ -143,11 +104,13 @@ export default function AuthWrapper({
         clearInterval(checkInterval)
       }
     }
-  }, [isConnected, status, address, pathname, isSignInPage, isInitialized, isAuthenticating, router, connect])
+  }, [isInitialized, pathname, router, connectionStatus, activeAccount?.address])
 
+  // Show nothing while initializing to prevent flashing
   if (!isInitialized) {
     return null
   }
 
+  // Render children once initialized
   return <>{children}</>
 }

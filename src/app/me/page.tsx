@@ -1,12 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useAccount, useDisconnect } from 'wagmi'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { LogOut, Copy, ExternalLink } from 'lucide-react'
 import Image from 'next/image'
 import AuthWrapper from '@/components/AuthWrapper'
+import { useDisconnect, useActiveWallet, useActiveAccount } from "thirdweb/react"
 
 interface User {
   id: string
@@ -30,12 +30,13 @@ interface Post {
 export default function MePage() {
   const [user, setUser] = useState<User | null>(null)
   const [posts, setPosts] = useState<Post[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
-  const { address, connector, chain } = useAccount()
+  const activeAccount = useActiveAccount()
   const { disconnect } = useDisconnect()
+  const wallet = useActiveWallet()
   const router = useRouter()
 
   const fetchPosts = async (page: number) => {
@@ -113,7 +114,9 @@ export default function MePage() {
   }
 
   const handleLogout = () => {
-    disconnect()
+    if (wallet) {
+      disconnect(wallet)
+    }
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     router.push('/login')

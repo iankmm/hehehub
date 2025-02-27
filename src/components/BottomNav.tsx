@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Search, MessageCircle, User, Plus, Image } from 'lucide-react'
+import { Home, Trophy, MessageCircle, User, Plus, Image } from 'lucide-react'
 import { useState } from 'react'
 import CreatePost from './CreatePost'
 
@@ -41,20 +41,17 @@ export default function BottomNav() {
               <span className="text-xs mt-1">NFTs</span>
             </Link>
 
-            <button
-              onClick={handleDiscoverClick}
-              className="flex flex-col items-center justify-center text-[#898989] relative"
+            <Link
+              href="/rankings"
+              className={`flex flex-col items-center justify-center flex-1 pt-2 pb-1 ${
+                pathname === '/rankings'
+                  ? 'text-pink-500'
+                  : 'text-[#898989] hover:text-white'
+              }`}
             >
-              <Search className="w-6 h-6" />
-              {showComingSoon && (
-                <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-[#2f2f2f] text-white 
-                            px-3 py-1 rounded-full text-xs whitespace-nowrap
-                            animate-fade-in-out">
-                  Coming Soon
-                </div>
-              )}
-              <span className="text-xs mt-1">Discover</span>
-            </button>
+              <Trophy className="w-6 h-6" />
+              <span className="text-xs mt-1">Rankings</span>
+            </Link>
           </div>
 
           {/* Center Plus Button */}
