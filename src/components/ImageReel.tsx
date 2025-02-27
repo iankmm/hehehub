@@ -19,7 +19,7 @@ const contract = getContract({
   chain: baseSepolia,
 });
 
-interface Image {
+interface Post {
   id: string;
   imageUrl: string;
   caption: string;
@@ -27,10 +27,15 @@ interface Image {
   username: string;
   heheScore: number;
   hasLiked: boolean;
+  createdAt: string;
+  user?: {
+    username: string;
+    heheScore: number;
+  }
 }
 
 interface ImageReelProps {
-  images: Image[];
+  images: Post[];
   onEndReached: () => void;
 }
 
@@ -44,14 +49,36 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
   const [showHehe, setShowHehe] = useState(false);
   const [showFakeHehe, setShowFakeHehe] = useState(false);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
-  const [imagesState, setImagesState] = useState<Image[]>(images);
   const [isMinting, setIsMinting] = useState(false);
   const [showConnectPrompt, setShowConnectPrompt] = useState(false);
   const [showMintSuccess, setShowMintSuccess] = useState(false);
   const [isWalletReady, setIsWalletReady] = useState(false);
   const [direction, setDirection] = useState(0);
 
-  const currentImage = imagesState[currentIndex];
+  // Get current image directly from props
+  const currentImage = images[currentIndex];
+
+  // Format current image if it has nested user data
+  const formattedCurrentImage = currentImage ? {
+    ...currentImage,
+    username: currentImage.user?.username || currentImage.username,
+    heheScore: currentImage.user?.heheScore || currentImage.heheScore
+  } : null;
+
+  // Initialize liked posts from props
+  useEffect(() => {
+    const initialLikedPosts = new Set(
+      images.filter(img => img.hasLiked).map(img => img.id)
+    );
+    setLikedPosts(initialLikedPosts);
+  }, [images]);
+
+  // Reset index when first image changes
+  useEffect(() => {
+    if (images[0]?.id !== currentImage?.id) {
+      setCurrentIndex(0);
+    }
+  }, [images[0]?.id]);
 
   // Handle wallet initialization
   useEffect(() => {
@@ -147,7 +174,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
       return;
     }
 
-    const currentImage = imagesState[currentIndex];
+    const currentImage = images[currentIndex];
     const isLiked = likedPosts.has(currentImage.id);
     const method = isLiked ? 'DELETE' : 'POST';
 
@@ -174,16 +201,15 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
         setLikedPosts(newLikedPosts);
 
         // Update likes count in the current image
-        const updatedImages = [...imagesState];
+        const updatedImages = [...images];
         updatedImages[currentIndex] = {
           ...currentImage,
           likes: isLiked ? currentImage.likes - 1 : currentImage.likes + 1,
           hasLiked: !isLiked
         };
-        setImagesState(updatedImages);
 
         // Refresh the posts data to get updated counts
-        const updatedRes = await fetch(`/api/posts?page=1&limit=${imagesState.length}`, {
+        const updatedRes = await fetch(`/api/posts?page=1&limit=${images.length}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -191,7 +217,8 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
         
         if (updatedRes.ok) {
           const data = await updatedRes.json();
-          setImagesState(data.posts);
+          const updatedImages = data.posts;
+          setCurrentIndex(0);
         }
       } else if (res.status === 401) {
         // Token expired or invalid
@@ -215,7 +242,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
           if (dy > 0 && currentIndex > 0) {
             setDirection(-1);
             setCurrentIndex(i => i - 1);
-          } else if (dy < 0 && currentIndex < imagesState.length - 1) {
+          } else if (dy < 0 && currentIndex < images.length - 1) {
             setDirection(1)
             setCurrentIndex(i => i + 1);
           }
@@ -227,7 +254,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
         if (my > 0 && currentIndex > 0) {
           setDirection(-1)
           setCurrentIndex(i => i - 1);
-        } else if (my < 0 && currentIndex < imagesState.length - 1) {
+        } else if (my < 0 && currentIndex < images.length - 1) {
           setDirection(1)
           setCurrentIndex(i => i + 1);
         }
@@ -240,20 +267,11 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
   }, []);
 
   useEffect(() => {
-    setImagesState(images);
-    // Initialize likedPosts with posts that the user has already liked
-    const initialLikedPosts = new Set(
-      images.filter(img => img.hasLiked).map(img => img.id)
-    );
-    setLikedPosts(initialLikedPosts);
-  }, [images]);
-
-  useEffect(() => {
     // Check if we're near the end and should load more
-    if (currentIndex >= imagesState.length - 2) {
+    if (currentIndex >= images.length - 2) {
       onEndReached();
     }
-  }, [currentIndex, imagesState.length, onEndReached]);
+  }, [currentIndex, images.length, onEndReached]);
 
   if (!mounted) return null;
 
@@ -433,13 +451,13 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
                 <div className="w-full bg-white/30 h-1 rounded-full overflow-hidden">
                   <div 
                     className="bg-white h-full rounded-full transition-all duration-300"
-                    style={{ width: `${((currentIndex + 1) / imagesState.length) * 100}%` }}
+                    style={{ width: `${((currentIndex + 1) / images.length) * 100}%` }}
                   />
                 </div>
               </div>
 
               {/* Navigation Hints */}
-              {currentIndex < imagesState.length - 1 && (
+              {currentIndex < images.length - 1 && (
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/50 text-sm animate-bounce">
                   Swipe up for next
                 </div>

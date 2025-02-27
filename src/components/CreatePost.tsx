@@ -2,20 +2,33 @@
 
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Upload, Image as ImageIcon } from 'lucide-react'
-import { AutoConnect } from "thirdweb/react";
+import { X, Upload, Image as ImageIcon, CheckCircle } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+
 interface CreatePostProps {
   isOpen: boolean
   setIsOpen: (isOpen: boolean) => void
+  onPostCreated?: (post: {
+    id: string
+    imageUrl: string
+    caption: string
+    likes: number
+    username: string
+    heheScore: number
+    hasLiked: boolean
+    createdAt: string
+  }) => void
 }
 
-export default function CreatePost({ isOpen, setIsOpen }: CreatePostProps) {
+export default function CreatePost({ isOpen, setIsOpen, onPostCreated }: CreatePostProps) {
   const [caption, setCaption] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [showSuccess, setShowSuccess] = useState(false)
+  const router = useRouter()
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -53,6 +66,9 @@ export default function CreatePost({ isOpen, setIsOpen }: CreatePostProps) {
 
       const uploadRes = await fetch('/api/upload', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: formData,
       })
 
@@ -81,14 +97,23 @@ export default function CreatePost({ isOpen, setIsOpen }: CreatePostProps) {
         throw new Error(data.error || 'Failed to create post')
       }
 
-      // Reset form and close modal
+      // Show success animation
+      setShowSuccess(true)
+      setTimeout(() => {
+        setShowSuccess(false)
+        setIsOpen(false)
+        router.push('/me')
+      }, 1500)
+
+      // Reset form
       setSelectedFile(null)
       setPreviewUrl(null)
       setCaption('')
-      setIsOpen(false)
 
-      // Refresh the feed
-      window.location.reload()
+      // Add new post to feed
+      if (onPostCreated) {
+        onPostCreated(data)
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Something went wrong')
     } finally {
@@ -126,6 +151,24 @@ export default function CreatePost({ isOpen, setIsOpen }: CreatePostProps) {
                   <X className="w-6 h-6" />
                 </button>
               </div>
+
+              {/* Success Animation */}
+              <AnimatePresence>
+                {showSuccess && (
+                  <motion.div
+                    initial={{ scale: 0.5, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 1.5, opacity: 0 }}
+                    transition={{ duration: 0.5 }}
+                    className="absolute inset-0 flex items-center justify-center z-50 bg-black/50 backdrop-blur-sm"
+                  >
+                    <div className="bg-green-500 text-white px-6 py-4 rounded-lg flex items-center gap-2">
+                      <CheckCircle className="w-6 h-6" />
+                      <span className="text-lg font-medium">Post created!</span>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Form */}
               <form onSubmit={handleSubmit} className="p-4 space-y-4">

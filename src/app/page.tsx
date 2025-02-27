@@ -26,6 +26,11 @@ interface Post {
   username: string;
   heheScore: number;
   hasLiked: boolean;
+  createdAt: string;
+  user?: {
+    username: string;
+    heheScore: number;
+  }
 }
 
 interface PostsResponse {
@@ -77,7 +82,7 @@ export default function Home() {
       if (page === 1) {
         setPosts(data.posts);
       } else {
-        setPosts(prevPosts => [...prevPosts, ...data.posts]);
+        setPosts((prevPosts) => [...prevPosts, ...data.posts]);
       }
       setTotalPages(data.totalPages);
       setCurrentPage(data.currentPage);
@@ -100,16 +105,6 @@ export default function Home() {
     fetchPosts(1);
   }, [router]);
 
-  const formattedPosts = posts.map(post => ({
-    id: post.id,
-    imageUrl: post.imageUrl,
-    caption: post.caption,
-    likes: post.likes,
-    username: post.username,
-    heheScore: post.heheScore,
-    hasLiked: post.hasLiked
-  }));
-
   if (isInitializing) {
     return (
       <div className="min-h-screen bg-[#1f1f1f] flex items-center justify-center">
@@ -123,8 +118,8 @@ export default function Home() {
 
   return (
       <div className="min-h-screen bg-[#1f1f1f]">
-        {formattedPosts.length > 0 ? (
-          <ImageReel images={formattedPosts} onEndReached={() => {
+        {posts.length > 0 ? (
+          <ImageReel images={posts} onEndReached={() => {
             if (!isLoading && currentPage < totalPages) {
               fetchPosts(currentPage + 1);
             }
@@ -149,10 +144,10 @@ export default function Home() {
 
         {showCreatePost && (
           <CreatePost
-            onClose={() => setShowCreatePost(false)}
-            onSuccess={() => {
-              setShowCreatePost(false);
-              fetchPosts(1);
+            isOpen={showCreatePost}
+            setIsOpen={setShowCreatePost}
+            onPostCreated={(newPost) => {
+              setPosts((prevPosts) => [newPost, ...prevPosts])
             }}
           />
         )}
