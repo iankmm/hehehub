@@ -3,8 +3,13 @@
 A TikTok-style meme sharing platform built with Next.js, where users can scroll through memes, like them with "hehe" reactions, and share their own memes.
 
 ## TODO
-- ethstorage for posts
--
+- implement supabase -> ethstorage for posts
+- implement randomized feed
+- move nfts to profile
+- implement liked posts in profile
+- implement leaderboard
+- change nft functionality to link to image id
+- change likes to erc20
 
 ## potential bounties
 - track: impact + public goods
