@@ -200,28 +200,11 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
         }
         setLikedPosts(newLikedPosts);
 
-        // Update likes count in the current image
-        const updatedImages = [...images];
-        updatedImages[currentIndex] = {
-          ...currentImage,
-          likes: isLiked ? currentImage.likes - 1 : currentImage.likes + 1,
-          hasLiked: !isLiked
-        };
+        // Update current image likes count
+        currentImage.likes = isLiked ? currentImage.likes - 1 : currentImage.likes + 1;
+        currentImage.hasLiked = !isLiked;
 
-        // Refresh the posts data to get updated counts
-        const updatedRes = await fetch(`/api/posts?page=1&limit=${images.length}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        if (updatedRes.ok) {
-          const data = await updatedRes.json();
-          const updatedImages = data.posts;
-          setCurrentIndex(0);
-        }
       } else if (res.status === 401) {
-        // Token expired or invalid
         localStorage.removeItem('token');
         router.push('/login');
       }
