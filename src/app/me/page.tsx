@@ -482,12 +482,12 @@ export default function MePage() {
                     return (
                       <div
                         key={post.id}
-                        className="card-wrapper relative cursor-pointer"
+                        className="card-wrapper relative w-full pb-[100%]"
                         style={{ perspective: '1000px' }}
                         onClick={() => setFlippedPostId(flipped ? null : post.id)}
                       >
                         <motion.div
-                          className="card-inner w-full h-full"
+                          className="card-inner absolute inset-0"
                           style={{
                             transformStyle: 'preserve-3d',
                           }}
@@ -501,11 +501,9 @@ export default function MePage() {
                         >
                           {/* FRONT SIDE */}
                           <div
-                            className="card-front bg-[#2f2f2f] rounded-lg overflow-hidden w-full aspect-square"
+                            className="card-front bg-[#2f2f2f] rounded-lg overflow-hidden absolute inset-0"
                             style={{
                               backfaceVisibility: 'hidden',
-                              position: 'absolute',
-                              top: 0, left: 0, right: 0, bottom: 0
                             }}
                           >
                             <div className="relative h-full">
@@ -541,11 +539,9 @@ export default function MePage() {
 
                           {/* BACK SIDE */}
                           <div
-                            className="card-back bg-[#2f2f2f] rounded-lg overflow-hidden aspect-square"
+                            className="card-back bg-[#2f2f2f] rounded-lg overflow-hidden absolute inset-0"
                             style={{
                               backfaceVisibility: 'hidden',
-                              position: 'absolute',
-                              top: 0, left: 0, right: 0, bottom: 0,
                               transform: 'rotateY(180deg)'
                             }}
                           >
@@ -571,7 +567,6 @@ export default function MePage() {
                       </div>
                     );
                   })}
-
                 </div>
               )}
             </div>
