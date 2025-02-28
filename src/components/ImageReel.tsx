@@ -255,6 +255,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
     if (currentIndex >= images.length - 2) {
       onEndReached();
     }
+    console.log("Meme has been changed!!!!!!!!!");
   }, [currentIndex, images.length, onEndReached]);
 
   if (!mounted) return null;
