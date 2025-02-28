@@ -241,6 +241,11 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
     e.preventDefault();
     e.stopPropagation();
 
+    if (!likedPosts.has(currentImage.id)) {
+      console.log("User can only mint if they have liked the post")
+      return;
+    }
+
     console.log('Mint clicked:', { 
       connectionStatus, 
       address: activeAccount?.address,
@@ -278,7 +283,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
       console.log(receipt)
       if (receipt.status === 'success') {
         setShowMintSuccess(true);
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        await new Promise(resolve => setTimeout(resolve, 4000));
         setShowMintSuccess(false);
       } else {
         throw new Error('Transaction failed');
