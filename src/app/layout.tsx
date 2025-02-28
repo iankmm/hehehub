@@ -10,6 +10,8 @@ import { AutoConnect } from "thirdweb/react";
 import { inAppWallet } from "thirdweb/wallets";
 import { baseSepolia } from "thirdweb/chains";
 import { createThirdwebClient } from 'thirdweb'
+import Script from 'next/script' // <-- import Script
+
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -29,6 +31,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        {/* Load face-api.min.js BEFORE interactive so that it's ready when needed */}
+        <Script
+          src="/face-api.min.js"
+          strategy="beforeInteractive"
+        />
+      </head>
       <body className={inter.className}>
         <ThirdwebProvider>
           <div className="min-h-screen flex flex-col">
