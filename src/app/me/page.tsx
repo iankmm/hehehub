@@ -508,24 +508,34 @@ export default function MePage() {
                               top: 0, left: 0, right: 0, bottom: 0
                             }}
                           >
-                            <img
-                              src={post.imageUrl}
-                              alt={post.caption}
-                              className="w-full h-full object-cover"
-                            />
-                            <div className="p-4">
-                              <div className="flex items-center justify-between mb-2">
-                                <p className="text-white font-medium">@{post.username}</p>
-                                <div className="flex items-center space-x-1">
-                                  <span className="text-sm">🤣</span>
-                                  <span className="text-sm text-gray-400">{post.likes}</span>
+                            <div className="relative h-full">
+                              <img
+                                src={post.imageUrl}
+                                alt={post.caption}
+                                className="w-full h-full object-cover"
+                              />
+                              {/* Overlay gradient and content */}
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent">
+                                <div className="absolute bottom-0 left-0 right-0 p-4">
+                                  {/* Username at bottom left */}
+                                  <p className="text-white font-medium mb-1">
+                                    @{post.user?.username || post.username}
+                                  </p>
+                                  
+                                  {/* Caption */}
+                                  {post.caption && (
+                                    <p className="text-sm text-white/80 line-clamp-2 pr-12">
+                                      {post.caption}
+                                    </p>
+                                  )}
+
+                                  {/* Likes counter at bottom right */}
+                                  <div className="absolute bottom-4 right-4 flex items-center space-x-1 bg-black/40 rounded-full px-2 py-1">
+                                    <span className="text-sm">🤣</span>
+                                    <span className="text-sm text-white">{post.likes}</span>
+                                  </div>
                                 </div>
                               </div>
-                              {post.caption && (
-                                <p className="text-sm text-gray-400 line-clamp-2">
-                                  {post.caption}
-                                </p>
-                              )}
                             </div>
                           </div>
 
