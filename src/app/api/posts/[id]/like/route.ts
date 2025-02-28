@@ -22,14 +22,13 @@ export async function POST(
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
- 
+
     const payload = verifyAuth(token);
     if (!payload) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const params = await context.params
-
+    const params = await context.params;
     const postId = params.id;
 
     // Get the post with its author
@@ -43,7 +42,7 @@ export async function POST(
       return NextResponse.json({ error: 'Post not found' }, { status: 404 });
     }
 
-    // Create like with a unique ID
+    // Create like
     const { data: like, error: likeError } = await supabase
       .from('Like')
       .insert({
@@ -56,7 +55,7 @@ export async function POST(
       .single();
 
     if (likeError) {
-      if (likeError.code === '23505') { // Unique constraint violation
+      if (likeError.code === '23505') {
         return NextResponse.json(
           { error: 'Already liked this post' },
           { status: 400 }
@@ -65,13 +64,7 @@ export async function POST(
       throw likeError;
     }
 
-    // Update liker's heheScore
-    const { data: liker, error: likerError } = await supabase.rpc('increment_hehe_score', {
-      user_id: payload.userId
-    });
-    if (likerError) throw likerError;
-
-    // Update post author's heheScore
+    // Only update post author's heheScore
     const { data: author, error: authorError } = await supabase.rpc('increment_hehe_score', {
       user_id: post.userId
     });
@@ -79,7 +72,6 @@ export async function POST(
 
     return NextResponse.json({
       like,
-      likerScore: liker.hehe_score,
       authorScore: author.hehe_score
     });
   } catch (error) {
@@ -129,12 +121,6 @@ export async function DELETE(
 
     if (likeError) throw likeError
 
-    // Update liker's heheScore
-    const { data: liker, error: likerError } = await supabase.rpc('decrement_hehe_score', {
-      user_id: payload.userId
-    })
-    if (likerError) throw likerError
-
     // Update post author's heheScore
     const { data: author, error: authorError } = await supabase.rpc('decrement_hehe_score', {
       user_id: post.userId
@@ -143,7 +129,6 @@ export async function DELETE(
 
     return NextResponse.json({
       like,
-      likerScore: liker.hehe_score,
       authorScore: author.hehe_score
     })
   } catch (error) {

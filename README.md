@@ -8,12 +8,32 @@ A TikTok-style meme sharing platform built with Next.js, where users can scroll 
 - implement liked posts in profile
 - change nft functionality to link to image id
 - change likes to erc20
-- mint nft increases hehe score
 - stack connection for fee pooling
 
-## potential bounties
+##  bounties
 - track: impact + public goods
-- maybe ai agent on eigenlayer
+- best project on zircuit
+- flow most killer app
+- buld the best app that combines... ink
+- build a mass consumer app fully on chain
+- build next gen socialfi u2u
+- build a decentralized social network ethstorage
+
+
+## maybe bounties
+- integrate story in your dapp
+- okto dapps
+- address based meme token behavior alert
+- consumer crypto prize (base)
+- most innovative use of agentkit
+- build an ai powered app on base
+- automatic meme  coin generator
+- best web3 onboarding zk
+- best consumer app zk
+- best use of account abstraction ink
+- create first memecoin on midnight
+- best use of coinbase onramp and stable coins
+- ripple usd stablecoin adoption
 
 
 
