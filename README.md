@@ -5,9 +5,7 @@ A TikTok-style meme sharing platform built with Next.js, where users can scroll 
 ## TODO
 - implement supabase -> ethstorage for posts
 - implement randomized feed
-- implement liked posts in profile
 - change nft functionality to link to image id
-- change likes to erc20
 - stack connection for fee pooling
 
 ##  bounties
