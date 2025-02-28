@@ -180,7 +180,7 @@ export default function MePage() {
 
       if (res.ok) {
         const data = await res.json()
-        console.log('Liked posts with reactions:', data)
+        console.log("liked posts data", data)
         setLikedPosts(data)
       }
     } catch (error) {
@@ -476,72 +476,69 @@ export default function MePage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {likedPosts.map((post) => (
-                    <motion.div
-                      key={post.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="relative cursor-pointer"
-                      style={{ perspective: '1000px' }}
-                      onClick={() => setFlippedPostId(flippedPostId === post.id ? null : post.id)}
-                    >
-                      <motion.div
-                        className="w-full relative"
-                        animate={{
-                          rotateY: flippedPostId === post.id ? 180 : 0,
-                        }}
-                        transition={{
-                          duration: 0.6,
-                          type: "spring",
-                          stiffness: 260,
-                          damping: 20
-                        }}
-                        style={{
-                          transformStyle: 'preserve-3d'
-                        }}
+                  {likedPosts.map((post) => {
+                    const flipped = flippedPostId === post.id;
+
+                    return (
+                      <div
+                        key={post.id}
+                        className="card-wrapper relative cursor-pointer"
+                        style={{ perspective: '1000px' }}
+                        onClick={() => setFlippedPostId(flipped ? null : post.id)}
                       >
-                        {/* Front of card (post) */}
-                        <div
-                          className={`bg-[#2f2f2f] rounded-lg overflow-hidden w-full
-                                    ${flippedPostId === post.id ? 'backface-hidden' : ''}`}
+                        <motion.div
+                          className="card-inner w-full h-full"
                           style={{
-                            backfaceVisibility: 'hidden',
-                            position: flippedPostId === post.id ? 'absolute' : 'relative',
-                            width: '100%'
+                            transformStyle: 'preserve-3d',
+                          }}
+                          animate={{ rotateY: flipped ? 180 : 0 }}
+                          transition={{
+                            duration: 0.6,
+                            type: 'spring',
+                            stiffness: 260,
+                            damping: 20
                           }}
                         >
-                          <div className="aspect-square relative">
+                          {/* FRONT SIDE */}
+                          <div
+                            className="card-front bg-[#2f2f2f] rounded-lg overflow-hidden w-full aspect-square"
+                            style={{
+                              backfaceVisibility: 'hidden',
+                              position: 'absolute',
+                              top: 0, left: 0, right: 0, bottom: 0
+                            }}
+                          >
                             <img
                               src={post.imageUrl}
                               alt={post.caption}
                               className="w-full h-full object-cover"
                             />
-                          </div>
-                          <div className="p-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <p className="text-white font-medium">@{post.username}</p>
-                              <div className="flex items-center space-x-1">
-                                <span className="text-sm">🤣</span>
-                                <span className="text-sm text-gray-400">{post.likes}</span>
+                            <div className="p-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-white font-medium">@{post.username}</p>
+                                <div className="flex items-center space-x-1">
+                                  <span className="text-sm">🤣</span>
+                                  <span className="text-sm text-gray-400">{post.likes}</span>
+                                </div>
                               </div>
+                              {post.caption && (
+                                <p className="text-sm text-gray-400 line-clamp-2">
+                                  {post.caption}
+                                </p>
+                              )}
                             </div>
-                            {post.caption && (
-                              <p className="text-sm text-gray-400 line-clamp-2">{post.caption}</p>
-                            )}
                           </div>
-                        </div>
 
-                        {/* Back of card (reaction) */}
-                        <div
-                          className={`bg-[#2f2f2f] rounded-lg overflow-hidden absolute top-0 w-full
-                                    ${flippedPostId === post.id ? '' : 'backface-hidden'}`}
-                          style={{
-                            backfaceVisibility: 'hidden',
-                            transform: 'rotateY(180deg)',
-                            height: '100%'
-                          }}
-                        >
-                          <div className="aspect-square relative">
+                          {/* BACK SIDE */}
+                          <div
+                            className="card-back bg-[#2f2f2f] rounded-lg overflow-hidden aspect-square"
+                            style={{
+                              backfaceVisibility: 'hidden',
+                              position: 'absolute',
+                              top: 0, left: 0, right: 0, bottom: 0,
+                              transform: 'rotateY(180deg)'
+                            }}
+                          >
                             {post.reaction_image_url ? (
                               <img
                                 src={post.reaction_image_url}
@@ -549,23 +546,22 @@ export default function MePage() {
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-gray-800">
-                                <p className="text-gray-400 text-center px-4">
-                                  No reaction image available
-                                </p>
+                              <div className="w-full h-full flex items-center justify-center text-white">
+                                No reaction image
                               </div>
                             )}
+                            <div className="p-4">
+                              <p className="text-white font-medium text-center">Your Reaction</p>
+                              <p className="text-sm text-gray-400 text-center">
+                                Click to flip back
+                              </p>
+                            </div>
                           </div>
-                          <div className="p-4">
-                            <p className="text-white font-medium text-center">Your Reaction</p>
-                            <p className="text-sm text-gray-400 text-center">
-                              {post.reaction_image_url ? 'Click to flip back' : 'No reaction captured'}
-                            </p>
-                          </div>
-                        </div>
-                      </motion.div>
-                    </motion.div>
-                  ))}
+                        </motion.div>
+                      </div>
+                    );
+                  })}
+
                 </div>
               )}
             </div>
