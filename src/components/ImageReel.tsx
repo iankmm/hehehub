@@ -2,15 +2,24 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { useGesture } from 'react-use-gesture';
 import { Image as ImageIcon } from 'lucide-react';
-import { useWriteContract, useAccount } from 'wagmi';
-import { waitForTransactionReceipt } from '@wagmi/core';
-import { decodeEventLog } from 'viem';
-import { getConfig } from '@/lib/wagmi';
-import HeheMemeABI from '@/contracts/HeheMeme.json';
 import { useRouter } from 'next/navigation';
-import { baseSepolia } from 'viem/chains';
+import { createThirdwebClient, getContract, sendTransaction, prepareContractCall, waitForReceipt } from "thirdweb";
+import { baseSepolia } from "thirdweb/chains";
+import { useActiveAccount, useActiveWalletConnectionStatus, useReadContract } from "thirdweb/react";
+import HeheMemeABI from '@/contracts/HeheMeme.json';
+import { Check } from 'lucide-react';
 
-interface Image {
+const client = createThirdwebClient({
+  clientId: "8e1035b064454b1b9505e0dd626a8555"
+});
+
+const contract = getContract({
+  client,
+  address: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "",
+  chain: baseSepolia,
+});
+
+interface Post {
   id: string;
   imageUrl: string;
   caption: string;
@@ -18,35 +27,59 @@ interface Image {
   username: string;
   heheScore: number;
   hasLiked: boolean;
+  createdAt: string;
+  user?: {
+    username: string;
+    heheScore: number;
+  }
 }
 
 interface ImageReelProps {
-  images: Image[];
+  images: Post[];
   onEndReached: () => void;
 }
 
 export default function ImageReel({ images, onEndReached }: ImageReelProps) {
   const router = useRouter();
-  const { isConnected, address, status } = useAccount();
+  const activeAccount = useActiveAccount();
+  const connectionStatus = useActiveWalletConnectionStatus();
   const [mounted, setMounted] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [showHehe, setShowHehe] = useState(false);
   const [showFakeHehe, setShowFakeHehe] = useState(false);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
-  const [imagesState, setImagesState] = useState<Image[]>(images);
   const [isMinting, setIsMinting] = useState(false);
   const [showConnectPrompt, setShowConnectPrompt] = useState(false);
   const [showMintSuccess, setShowMintSuccess] = useState(false);
-  const [mintedTokenId, setMintedTokenId] = useState<string>();
   const [isWalletReady, setIsWalletReady] = useState(false);
   const [direction, setDirection] = useState(0);
   const [faceApiLoaded, setFaceApiLoaded] = useState(false);
 
-  const currentImage = imagesState[currentIndex];
+  // Get current image directly from props
+  const currentImage = images[currentIndex];
 
-  // Contract interaction hooks
-  const { writeContract, data: mintData, error: mintError } = useWriteContract();
+  // Format current image if it has nested user data
+  const formattedCurrentImage = currentImage ? {
+    ...currentImage,
+    username: currentImage.user?.username || currentImage.username,
+    heheScore: currentImage.user?.heheScore || currentImage.heheScore
+  } : null;
+
+  // Initialize liked posts from props
+  useEffect(() => {
+    const initialLikedPosts = new Set(
+      images.filter(img => img.hasLiked).map(img => img.id)
+    );
+    setLikedPosts(initialLikedPosts);
+  }, [images]);
+
+  // Reset index when first image changes
+  useEffect(() => {
+    if (images[0]?.id !== currentImage?.id) {
+      setCurrentIndex(0);
+    }
+  }, [images[0]?.id]);
 
   // Handle wallet initialization
   useEffect(() => {
@@ -65,119 +98,69 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
     if (!mounted) return;
     
     console.log('Wallet status:', {
-      isConnected,
-      status,
-      address,
+      isConnected: connectionStatus === 'connected',
+      connectionStatus,
+      address: activeAccount?.address,
       isWalletReady
     });
 
     // Reset wallet ready state if disconnected
-    if (!isConnected || status === 'disconnected') {
+    if (connectionStatus !== 'connected') {
       setIsWalletReady(false);
     }
-  }, [isConnected, status, address, mounted]);
-
-  useEffect(() => {
-    if (mintError) {
-      console.error('Mint error:', mintError);
-      setIsMinting(false);
-    }
-  }, [mintError]);
-
-  useEffect(() => {
-    const waitForMint = async () => {
-      if (!mintData) return;
-      
-      try {
-        const receipt = await waitForTransactionReceipt(getConfig(), {
-          hash: mintData,
-          confirmations: 1
-        });
-        
-        // Find the MemeMinted event
-        const mintEvent = receipt.logs.find(log => {
-          try {
-            const decodedLog = decodeEventLog({
-              abi: HeheMemeABI.abi,
-              data: log.data,
-              topics: log.topics,
-            });
-            return decodedLog.eventName === 'MemeMinted';
-          } catch {
-            return false;
-          }
-        });
-
-        if (mintEvent) {
-          try {
-            const decodedLog = decodeEventLog({
-              abi: HeheMemeABI.abi,
-              data: mintEvent.data,
-              topics: mintEvent.topics,
-            });
-            setMintedTokenId(decodedLog.args.tokenId.toString());
-          } catch (error) {
-            console.error('Error decoding mint event:', error);
-          }
-        }
-
-        setShowMintSuccess(true);
-        setTimeout(() => {
-          setShowMintSuccess(false);
-          setMintedTokenId(undefined);
-        }, 3000);
-      } catch (error) {
-        console.error('Error waiting for transaction:', error);
-      } finally {
-        setIsMinting(false);
-      }
-    };
-
-    waitForMint();
-  }, [mintData]);
+  }, [connectionStatus, activeAccount?.address, mounted]);
 
   const handleMint = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
     console.log('Mint clicked:', { 
-      isConnected, 
-      status, 
-      address,
+      connectionStatus, 
+      address: activeAccount?.address,
       isWalletReady,
       mounted 
     });
 
-    if (!isWalletReady || !isConnected || status !== 'connected' || !address) {
+    if (!isWalletReady || connectionStatus !== 'connected' || !activeAccount?.address) {
       setShowConnectPrompt(true);
       setTimeout(() => setShowConnectPrompt(false), 3000);
       return;
     }
 
-    if (!currentImage?.imageUrl) {
-      console.error('No image URL available');
-      return;
-    }
-
     if (isMinting) return;
 
-    const contractAddress = process.env.NEXT_PUBLIC_HEHEMEME_CONTRACT_ADDRESS;
-    if (!contractAddress) {
-      console.error('Contract address not configured');
-      return;
-    }
-
     setIsMinting(true);
+
     try {
-      await writeContract({
-        address: contractAddress as `0x${string}`,
-        abi: HeheMemeABI.abi,
-        functionName: 'mintMeme',
-        args: [currentImage.imageUrl],
-        chainId: baseSepolia.id,
+      const transaction = await prepareContractCall({
+        contract,
+        method: "function mintMeme(string memory _tokenURI)",
+        params: [currentImage.imageUrl],
       });
+
+      const { transactionHash } = await sendTransaction({
+        account: activeAccount,
+        transaction,
+      });
+
+      const receipt = await waitForReceipt({
+        client,
+        chain: baseSepolia,
+        transactionHash,
+      });
+      console.log(receipt)
+      // Check if transaction was successful
+      if (receipt.status === 'success') {
+        setShowMintSuccess(true);
+        // Keep the success message visible for longer (5 seconds)
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        setShowMintSuccess(false);
+      } else {
+        throw new Error('Transaction failed');
+      }
     } catch (error) {
       console.error('Error minting:', error);
+    } finally {
       setIsMinting(false);
     }
   };
@@ -192,7 +175,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
       return;
     }
 
-    const currentImage = imagesState[currentIndex];
+    const currentImage = images[currentIndex];
     const isLiked = likedPosts.has(currentImage.id);
     const method = isLiked ? 'DELETE' : 'POST';
 
@@ -218,28 +201,11 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
         }
         setLikedPosts(newLikedPosts);
 
-        // Update likes count in the current image
-        const updatedImages = [...imagesState];
-        updatedImages[currentIndex] = {
-          ...currentImage,
-          likes: isLiked ? currentImage.likes - 1 : currentImage.likes + 1,
-          hasLiked: !isLiked
-        };
-        setImagesState(updatedImages);
+        // Update current image likes count
+        currentImage.likes = isLiked ? currentImage.likes - 1 : currentImage.likes + 1;
+        currentImage.hasLiked = !isLiked;
 
-        // Refresh the posts data to get updated counts
-        const updatedRes = await fetch(`/api/posts?page=1&limit=${imagesState.length}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        if (updatedRes.ok) {
-          const data = await updatedRes.json();
-          setImagesState(data.posts);
-        }
       } else if (res.status === 401) {
-        // Token expired or invalid
         localStorage.removeItem('token');
         router.push('/login');
       }
@@ -260,7 +226,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
           if (dy > 0 && currentIndex > 0) {
             setDirection(-1);
             setCurrentIndex(i => i - 1);
-          } else if (dy < 0 && currentIndex < imagesState.length - 1) {
+          } else if (dy < 0 && currentIndex < images.length - 1) {
             setDirection(1)
             setCurrentIndex(i => i + 1);
           }
@@ -272,7 +238,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
         if (my > 0 && currentIndex > 0) {
           setDirection(-1)
           setCurrentIndex(i => i - 1);
-        } else if (my < 0 && currentIndex < imagesState.length - 1) {
+        } else if (my < 0 && currentIndex < images.length - 1) {
           setDirection(1)
           setCurrentIndex(i => i + 1);
         }
@@ -285,142 +251,11 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
   }, []);
 
   useEffect(() => {
-    setImagesState(images);
-    // Initialize likedPosts with posts that the user has already liked
-    const initialLikedPosts = new Set(
-      images.filter(img => img.hasLiked).map(img => img.id)
-    );
-    setLikedPosts(initialLikedPosts);
-  }, [images]);
-
-  // useEffect(() => {
-  //   // Check if we're near the end and should load more
-  //   if (currentIndex >= imagesState.length - 2) {
-  //     onEndReached();
-  //   }
-  //   console.log("meme has changed!!!!!!!!!!!!!!!")
-
-  // }, [currentIndex, imagesState.length, onEndReached]);
-// useEffect(() => {
-//   if (currentIndex >= imagesState.length - 2) {
-//     onEndReached();
-//   }
-
-//   console.log("meme has changed!!!!!!!!!!!!!!!");
-
-//   // Wait for 1 second before capturing the screenshot
-//   const timeout = setTimeout(async () => {
-//     const canvas = document.createElement("canvas");
-//     const video = document.getElementById("video") as HTMLVideoElement;
-//     if (!video) return;
-
-//     canvas.width = video.videoWidth;
-//     canvas.height = video.videoHeight;
-//     const ctx = canvas.getContext("2d");
-//     if (!ctx) return;
-
-//     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-//     // Run face detection
-//     const detections = await faceapi
-//       .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
-//       .withFaceLandmarks()
-//       .withFaceExpressions();
-
-//     faceapi.draw.drawDetections(canvas, detections);
-//     faceapi.draw.drawFaceLandmarks(canvas, detections);
-//     faceapi.draw.drawFaceExpressions(canvas, detections);
-
-//     // Get the most probable emotion
-//     if (detections.length > 0) {
-//       const emotions = detections[0].expressions;
-//       const mostProbableEmotion = Object.keys(emotions).reduce((a, b) =>
-//         emotions[a] > emotions[b] ? a : b
-//       );
-//       console.log("Most probable emotion:", mostProbableEmotion);
-//     }
-
-//     // Add screenshot to page
-//     document.body.appendChild(canvas);
-//   }, 1000);
-
-//   return () => clearTimeout(timeout);
-// }, [currentIndex, imagesState.length, onEndReached]);
-
-useEffect(() => {
-  const script = document.createElement("script");
-  script.src = "/face-api.min.js";
-  script.async = true;
-  script.onload = () => setFaceApiLoaded(true);
-  document.body.appendChild(script);
-
-  return () => {
-    document.body.removeChild(script);
-  };
-}, []);
-
-useEffect(() => {
-  if (!faceApiLoaded) return;
-
-  async function loadModelsAndStartVideo() {
-    await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri("/models"),
-      faceapi.nets.faceLandmark68Net.loadFromUri("/models"),
-      faceapi.nets.faceRecognitionNet.loadFromUri("/models"),
-      faceapi.nets.faceExpressionNet.loadFromUri("/models"),
-    ]);
-
-    startVideo();
-  }
-
-  loadModelsAndStartVideo();
-}, [faceApiLoaded]);
-
-const startVideo = () => {
-  navigator.mediaDevices
-    .getUserMedia({ video: true })
-    .then((stream) => {
-      const video = document.getElementById("video") as HTMLVideoElement;
-      if (video) video.srcObject = stream;
-    })
-    .catch((err) => console.error("Camera access error:", err));
-};
-
-useEffect(() => {
-  if (!faceApiLoaded) return;
-
-  console.log("meme has changed!!!!!!!!!!!!!!!");
-
-  const timeout = setTimeout(async () => {
-    const video = document.getElementById("video") as HTMLVideoElement;
-    const canvas = document.createElement("canvas");
-    if (!video) return;
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const detections = await faceapi
-      .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
-      .withFaceLandmarks()
-      .withFaceExpressions();
-
-    if (detections.length > 0) {
-      const emotions = detections[0].expressions;
-      const mostProbableEmotion = Object.keys(emotions).reduce((a, b) =>
-        emotions[a] > emotions[b] ? a : b
-      );
-      console.log("Most probable emotion:", mostProbableEmotion);
+    // Check if we're near the end and should load more
+    if (currentIndex >= images.length - 2) {
+      onEndReached();
     }
-  }, 1000);
-
-  return () => clearTimeout(timeout);
-}, [currentIndex]);
-
-
+  }, [currentIndex, images.length, onEndReached]);
 
   if (!mounted) return null;
 
@@ -524,7 +359,7 @@ useEffect(() => {
                            hover:bg-pink-600 transition-all duration-200 
                            flex items-center justify-center
                            relative group"
-                  title={isConnected ? 'Mint as NFT' : 'Connect wallet to mint'}
+                  title={connectionStatus === 'connected' ? 'Mint as NFT' : 'Connect wallet to mint'}
                 >
                   {isMinting ? (
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -535,7 +370,7 @@ useEffect(() => {
                   {/* Tooltip */}
                   <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs py-1 px-2 rounded
                                 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-                    {isConnected ? 'Mint as NFT' : 'Connect wallet to mint'}
+                    {connectionStatus === 'connected' ? 'Mint as NFT' : 'Connect wallet to mint'}
                   </div>
                 </button>
 
@@ -571,16 +406,25 @@ useEffect(() => {
               <AnimatePresence>
                 {showMintSuccess && (
                   <motion.div
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0, opacity: 0 }}
-                    className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="fixed inset-0 flex items-center justify-center z-50 bg-black/50 backdrop-blur-sm"
                   >
-                    <div className="bg-black/80 backdrop-blur-sm rounded-xl p-8 text-center">
-                      <h3 className="text-3xl font-bold text-white mb-2">NFT Minted! 🎨</h3>
-                      {mintedTokenId && (
-                        <p className="text-gray-300">Token ID: #{mintedTokenId}</p>
-                      )}
+                    <div className="bg-[#2f2f2f] rounded-2xl p-8 shadow-xl max-w-sm w-full mx-4">
+                      <div className="flex flex-col items-center text-center space-y-4">
+                        <div className="w-16 h-16 bg-pink-500 rounded-full flex items-center justify-center">
+                          <Check className="w-8 h-8 text-white" />
+                        </div>
+                        <h3 className="text-2xl font-bold text-white">Successfully minted!</h3>
+                        <p className="text-gray-400">Your meme has been minted as an NFT. View it in your profile.</p>
+                        <button
+                          onClick={() => setShowMintSuccess(false)}
+                          className="mt-6 w-full bg-pink-500 text-white py-3 px-6 rounded-lg font-medium hover:bg-pink-600 transition-colors"
+                        >
+                          Continue
+                        </button>
+                      </div>
                     </div>
                   </motion.div>
                 )}
@@ -591,30 +435,17 @@ useEffect(() => {
                 <div className="w-full bg-white/30 h-1 rounded-full overflow-hidden">
                   <div 
                     className="bg-white h-full rounded-full transition-all duration-300"
-                    style={{ width: `${((currentIndex + 1) / imagesState.length) * 100}%` }}
+                    style={{ width: `${((currentIndex + 1) / images.length) * 100}%` }}
                   />
                 </div>
               </div>
 
               {/* Navigation Hints */}
-              {currentIndex < imagesState.length - 1 && (
+              {currentIndex < images.length - 1 && (
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/50 text-sm animate-bounce">
                   Swipe up for next
                 </div>
               )}
-
-              {/* Debug Info */}
-              {/* {process.env.NODE_ENV === 'development' && (
-                <div className="absolute top-4 left-4 bg-black/50 p-2 rounded text-xs text-white">
-                  <div>Contract: {process.env.NEXT_PUBLIC_HEHEMEME_CONTRACT_ADDRESS}</div>
-                  <div>Connected: {isConnected ? 'Yes' : 'No'}</div>
-                  <div>Image URL: {currentImage?.imageUrl?.slice(0, 20)}...</div>
-                  <div>Is Minting: {isMinting ? 'Yes' : 'No'}</div>
-                  <div>Transaction Hash: {mintData}</div>
-                  <div>Error: {mintError ? String(mintError) : 'None'}</div>
-                  <div>Minted Token ID: {mintedTokenId || 'None'}</div>
-                </div>
-              )} */}
             </div>
           </motion.div>
         </AnimatePresence>

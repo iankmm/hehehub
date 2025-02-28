@@ -2,15 +2,15 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAccount } from 'wagmi'
 import { Laugh } from 'lucide-react'
+import { useActiveAccount } from "thirdweb/react"
 
 export default function SignupPage() {
   const [username, setUsername] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
-  const { address } = useAccount()
+  const activeAccount = useActiveAccount()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -23,7 +23,7 @@ export default function SignupPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username, address }),
+        body: JSON.stringify({ username, address: activeAccount?.address }),
       })
 
       const data = await res.json()

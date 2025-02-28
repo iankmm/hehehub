@@ -102,3 +102,4 @@ out/
 *.tmp
 *.temp
 *~
+lib
