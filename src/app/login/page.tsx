@@ -142,7 +142,7 @@ export default function LoginPage() {
             </button>
           </form>
         ) : (
-          <div className="space-y-4 justify-center items-center">
+          <div className="flex space-y-4 justify-center items-center">
             <ConnectButton
               client={client}
               accountAbstraction={{

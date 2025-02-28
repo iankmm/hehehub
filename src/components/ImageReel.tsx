@@ -1,11 +1,12 @@
+"use client"; // Make sure this runs on the client side
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useGesture } from 'react-use-gesture';
 import { Image as ImageIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createThirdwebClient, getContract, sendTransaction, prepareContractCall, waitForReceipt } from "thirdweb";
 import { baseSepolia } from "thirdweb/chains";
-import { useActiveAccount, useActiveWalletConnectionStatus, useReadContract } from "thirdweb/react";
+import { useActiveAccount, useActiveWalletConnectionStatus } from "thirdweb/react";
 import HeheMemeABI from '@/contracts/HeheMeme.json';
 import { Check } from 'lucide-react';
 
@@ -43,6 +44,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
   const router = useRouter();
   const activeAccount = useActiveAccount();
   const connectionStatus = useActiveWalletConnectionStatus();
+  
   const [mounted, setMounted] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -56,17 +58,23 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
   const [direction, setDirection] = useState(0);
   const [faceApiLoaded, setFaceApiLoaded] = useState(false);
 
-  // Get current image directly from props
-  const currentImage = images[currentIndex];
+  // === ADDED for face detection ===
+  const [timeElapsed, setTimeElapsed] = useState(0);
+  const [isTimerComplete, setIsTimerComplete] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [smileDetected, setSmileDetected] = useState(false);
 
-  // Format current image if it has nested user data
+  // The current image
+  const currentImage = images[currentIndex];
   const formattedCurrentImage = currentImage ? {
     ...currentImage,
     username: currentImage.user?.username || currentImage.username,
     heheScore: currentImage.user?.heheScore || currentImage.heheScore
   } : null;
 
-  // Initialize liked posts from props
+  // Initialize liked posts
   useEffect(() => {
     const initialLikedPosts = new Set(
       images.filter(img => img.hasLiked).map(img => img.id)
@@ -89,7 +97,6 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
       setMounted(true);
       setIsWalletReady(true);
     };
-
     initializeWallet();
   }, []);
 
@@ -104,12 +111,133 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
       isWalletReady
     });
 
-    // Reset wallet ready state if disconnected
     if (connectionStatus !== 'connected') {
       setIsWalletReady(false);
     }
   }, [connectionStatus, activeAccount?.address, mounted]);
 
+  // === ADDED for face detection: Load models once ===
+  useEffect(() => {
+    async function loadModels() {
+      try {
+        const faceapi = (window as any).faceapi;
+        await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+        await faceapi.nets.faceExpressionNet.loadFromUri('/models');
+        setModelsLoaded(true);
+      } catch (error) {
+        console.error('Error loading face-api models:', error);
+      }
+    }
+    loadModels();
+  }, []);
+
+  // === ADDED for face detection: Start camera ===
+  useEffect(() => {
+    if (!modelsLoaded) return;
+
+    let localStream: MediaStream;
+    async function startVideo() {
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        if (videoRef.current) {
+          videoRef.current.srcObject = localStream;
+          await videoRef.current.play();
+        }
+        setCameraReady(true);
+      } catch (error) {
+        console.error('Error accessing camera:', error);
+      }
+    }
+
+    startVideo();
+
+    return () => {
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [modelsLoaded]);
+
+  // === Modify timer effect to only run for unliked posts ===
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    setTimeElapsed(0);
+    setIsTimerComplete(false);
+    setSmileDetected(false);
+
+    // Check if post is already liked
+    if (likedPosts.has(currentImage.id)) {
+      setSmileDetected(true);
+      setTimeElapsed(REACTION_TIMER_SECONDS);
+      setIsTimerComplete(true);
+      return;
+    }
+
+    if (cameraReady && modelsLoaded) {
+      interval = setInterval(async () => {
+        setTimeElapsed(prev => {
+          const newTime = prev + 1;
+
+          if (videoRef.current) {
+            detectSmile(videoRef.current).then((isSmiling) => {
+              if (isSmiling) {
+                console.log('User is smiling or laughing! Timer complete.');
+                setSmileDetected(true);
+                setTimeElapsed(REACTION_TIMER_SECONDS); // Set to full
+                setIsTimerComplete(true);
+                handleLaugh();
+                clearInterval(interval);
+              }
+            });
+          }
+
+          if (newTime >= 5) {
+            setIsTimerComplete(true);
+            clearInterval(interval);
+          }
+          return newTime;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      clearInterval(interval);
+      setTimeElapsed(0);
+      setSmileDetected(false);
+    };
+  }, [currentIndex, cameraReady, modelsLoaded]);
+
+  // === ADDED for face detection: The function to detect smiles ===
+  async function detectSmile(videoEl: HTMLVideoElement) {
+    try {
+      const faceapi = (window as any).faceapi;
+      const detections = await faceapi
+        .detectAllFaces(
+          videoEl,
+          new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.2 })
+        )
+        .withFaceExpressions();
+  
+      console.log('detections:', detections);
+  
+      if (detections && detections.length > 0) {
+        const detection = detections[0];
+        const { happy } = detection.expressions;
+        console.log('happy score:', happy);
+        if (happy > 0.7) {
+          return true;
+        }
+      } else {
+        console.log('No face detected');
+      }
+    } catch (err) {
+      console.error('Error detecting smile:', err);
+    }
+    return false;
+  }
+
+  // Mint
   const handleMint = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -149,10 +277,8 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
         transactionHash,
       });
       console.log(receipt)
-      // Check if transaction was successful
       if (receipt.status === 'success') {
         setShowMintSuccess(true);
-        // Keep the success message visible for longer (5 seconds)
         await new Promise(resolve => setTimeout(resolve, 5000));
         setShowMintSuccess(false);
       } else {
@@ -165,10 +291,8 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
     }
   };
 
-  const handleLaugh = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
+  // Like
+  const handleLaugh = async () => {
     const token = localStorage.getItem('token');
     if (!token) {
       router.push('/login');
@@ -176,35 +300,27 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
     }
 
     const currentImage = images[currentIndex];
-    const isLiked = likedPosts.has(currentImage.id);
-    const method = isLiked ? 'DELETE' : 'POST';
+    if (likedPosts.has(currentImage.id)) {
+      return;
+    }
 
     try {
       const res = await fetch(`/api/posts/${currentImage.id}/like`, {
-        method,
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
 
       if (res.ok) {
-        // Update liked status locally
         const newLikedPosts = new Set(likedPosts);
-        if (isLiked) {
-          newLikedPosts.delete(currentImage.id);
-          setShowFakeHehe(true);
-          setTimeout(() => setShowFakeHehe(false), 1500);
-        } else {
-          newLikedPosts.add(currentImage.id);
-          setShowHehe(true);
-          setTimeout(() => setShowHehe(false), 1500);
-        }
+        newLikedPosts.add(currentImage.id);
         setLikedPosts(newLikedPosts);
+        setShowHehe(true);
+        setTimeout(() => setShowHehe(false), 1500);
 
-        // Update current image likes count
-        currentImage.likes = isLiked ? currentImage.likes - 1 : currentImage.likes + 1;
-        currentImage.hasLiked = !isLiked;
-
+        currentImage.likes += 1;
+        currentImage.hasLiked = true;
       } else if (res.status === 401) {
         localStorage.removeItem('token');
         router.push('/login');
@@ -214,10 +330,10 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
     }
   };
 
+  // Gesture
   const bind = useGesture({
     onDrag: ({ movement: [mx, my], velocity, direction: [dx, dy], distance, last }) => {
       setIsDragging(true);
-      
       if (last) {
         setIsDragging(false);
         const swipeThreshold = velocity > 0.3 || distance > 50;
@@ -251,7 +367,6 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
   }, []);
 
   useEffect(() => {
-    // Check if we're near the end and should load more
     if (currentIndex >= images.length - 2) {
       onEndReached();
     }
@@ -273,6 +388,8 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
       opacity: 0
     })
   };
+
+  const REACTION_TIMER_SECONDS = 5; // 5-second timer
 
   return (
     <div className="fixed inset-0 bg-black">
@@ -303,12 +420,12 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
                   className="max-w-full max-h-full w-auto h-auto object-contain"
                   draggable="false"
                   style={{
-                    maxHeight: 'calc(100vh - 120px)', // Account for top and bottom bars
+                    maxHeight: 'calc(100vh - 120px)',
                     width: 'auto'
                   }}
                 />
               </div>
-              
+
               {/* HEHE Animation */}
               <AnimatePresence>
                 {showHehe && (
@@ -338,7 +455,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
                   </motion.div>
                 )}
               </AnimatePresence>
-              
+
               {/* Overlay Content */}
               <div className="absolute bottom-16 left-0 right-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
                 <div className="text-white mb-4">
@@ -351,7 +468,6 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
 
               {/* Side Actions */}
               <div className="absolute right-4 bottom-32 flex flex-col items-center gap-6">
-                {/* Mint NFT Button */}
                 <button
                   onClick={handleMint}
                   disabled={isMinting}
@@ -366,17 +482,13 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
                   ) : (
                     <ImageIcon className="w-5 h-5" />
                   )}
-                  
-                  {/* Tooltip */}
                   <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs py-1 px-2 rounded
                                 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
                     {connectionStatus === 'connected' ? 'Mint as NFT' : 'Connect wallet to mint'}
                   </div>
                 </button>
 
-                {/* Like Button */}
-                <button
-                  onClick={handleLaugh}
+                <div
                   className={`rounded-full p-3 transition-all duration-200 flex items-center space-x-2 ${
                     likedPosts.has(currentImage.id)
                       ? 'bg-pink-500 text-white'
@@ -385,9 +497,8 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
                 >
                   <span className="text-xl">🤣</span>
                   <span className="font-medium">{currentImage.likes}</span>
-                </button>
+                </div>
 
-                {/* Connect Prompt */}
                 <AnimatePresence>
                   {showConnectPrompt && (
                     <motion.div
@@ -402,7 +513,6 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
                 </AnimatePresence>
               </div>
 
-              {/* Mint Success Animation */}
               <AnimatePresence>
                 {showMintSuccess && (
                   <motion.div
@@ -430,17 +540,19 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
                 )}
               </AnimatePresence>
 
-              {/* Progress Bar */}
-              <div className="absolute top-2 left-0 right-0 px-4 z-50">
-                <div className="w-full bg-white/30 h-1 rounded-full overflow-hidden">
-                  <div 
-                    className="bg-white h-full rounded-full transition-all duration-300"
-                    style={{ width: `${((currentIndex + 1) / images.length) * 100}%` }}
-                  />
-                </div>
+              <div className="absolute top-0 left-0 right-0 z-20 h-1 bg-gray-800">
+                <div
+                  className={`h-full transition-all duration-200 ease-linear ${
+                    smileDetected
+                      ? 'bg-green-500'
+                      : isTimerComplete
+                        ? 'bg-red-500'
+                        : 'bg-white'
+                  }`}
+                  style={{ width: `${(timeElapsed / REACTION_TIMER_SECONDS) * 100}%` }}
+                />
               </div>
 
-              {/* Navigation Hints */}
               {currentIndex < images.length - 1 && (
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/50 text-sm animate-bounce">
                   Swipe up for next
@@ -450,6 +562,16 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {/* Hidden video element for face detection */}
+      <video
+        ref={videoRef}
+        className="hidden"
+        width="640"
+        height="480"
+        muted
+        playsInline
+      />
     </div>
   );
 }

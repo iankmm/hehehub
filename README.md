@@ -8,7 +8,8 @@ A TikTok-style meme sharing platform built with Next.js, where users can scroll 
 - implement liked posts in profile
 - change nft functionality to link to image id
 - change likes to erc20
-- fix likes not working (not updating without refresh)
+- mint nft increases hehe score
+- stack connection for fee pooling
 
 ## potential bounties
 - track: impact + public goods
