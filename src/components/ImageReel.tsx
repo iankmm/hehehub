@@ -54,6 +54,8 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
   const [showMintSuccess, setShowMintSuccess] = useState(false);
   const [isWalletReady, setIsWalletReady] = useState(false);
   const [direction, setDirection] = useState(0);
+  const [timeElapsed, setTimeElapsed] = useState(0);
+  const [isTimerComplete, setIsTimerComplete] = useState(false);
 
   // Get current image directly from props
   const currentImage = images[currentIndex];
@@ -108,6 +110,40 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
       setIsWalletReady(false);
     }
   }, [connectionStatus, activeAccount?.address, mounted]);
+
+  // Replace the timer effect
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    // Reset timer when image changes
+    setTimeElapsed(0);
+    setIsTimerComplete(false);
+    
+    // Start the timer
+    interval = setInterval(() => {
+      setTimeElapsed(prev => {
+        const newTime = prev + 1;
+
+        // take picture
+
+        // evaluate if picture has people smiling or laughing
+
+        // if so, set isTimerComplete to true and turn green
+
+        
+        if (newTime === 5) {
+          setIsTimerComplete(true);
+          clearInterval(interval);
+        }
+        return newTime;
+      });
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+      setTimeElapsed(0);
+    };
+  }, [currentIndex]);
 
   const handleMint = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -273,6 +309,8 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
     })
   };
 
+  const REACTION_TIMER_SECONDS = 5; // 5 seconds timer
+
   return (
     <div className="fixed inset-0 bg-black">
       <div 
@@ -430,13 +468,13 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
               </AnimatePresence>
 
               {/* Progress Bar */}
-              <div className="absolute top-2 left-0 right-0 px-4 z-50">
-                <div className="w-full bg-white/30 h-1 rounded-full overflow-hidden">
-                  <div 
-                    className="bg-white h-full rounded-full transition-all duration-300"
-                    style={{ width: `${((currentIndex + 1) / images.length) * 100}%` }}
-                  />
-                </div>
+              <div className="absolute top-0 left-0 right-0 z-20 h-1 bg-gray-800">
+                <div 
+                  className={`h-full transition-all duration-200 ease-linear ${
+                    timeElapsed >= REACTION_TIMER_SECONDS ? 'bg-red-500' : 'bg-white'
+                  }`}
+                  style={{ width: `${(timeElapsed / REACTION_TIMER_SECONDS) * 100}%` }}
+                />
               </div>
 
               {/* Navigation Hints */}

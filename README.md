@@ -7,9 +7,8 @@ A TikTok-style meme sharing platform built with Next.js, where users can scroll 
 - implement randomized feed
 - implement liked posts in profile
 - change nft functionality to link to image id
+- implement facial recognition for hehe score
 - change likes to erc20
-- fix likes not working (not updating without refresh)
-- center login page
 
 ## potential bounties
 - track: impact + public goods
