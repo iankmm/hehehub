@@ -309,25 +309,64 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
     }
 
     try {
-      const res = await fetch(`/api/posts/${currentImage.id}/like`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      // Capture the reaction image
+      if (videoRef.current) {
+        const canvas = document.createElement('canvas');
+        canvas.width = videoRef.current.videoWidth;
+        canvas.height = videoRef.current.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(videoRef.current, 0, 0);
+        
+        // Convert to blob
+        const blob = await new Promise<Blob>((resolve) => 
+          canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.8)
+        );
 
-      if (res.ok) {
-        const newLikedPosts = new Set(likedPosts);
-        newLikedPosts.add(currentImage.id);
-        setLikedPosts(newLikedPosts);
-        setShowHehe(true);
-        setTimeout(() => setShowHehe(false), 1500);
+        // Create form data
+        const formData = new FormData();
+        formData.append('image', blob, 'reaction.jpg');
+        formData.append('postId', currentImage.id);
 
-        currentImage.likes += 1;
-        currentImage.hasLiked = true;
-      } else if (res.status === 401) {
-        localStorage.removeItem('token');
-        router.push('/login');
+        // Upload reaction
+        const reactionRes = await fetch('/api/upload/reaction', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        if (!reactionRes.ok) {
+          console.error('Failed to upload reaction');
+        }
+
+        const { url: reactionUrl } = await reactionRes.json();
+
+        console.log("reactionUrl", reactionUrl)
+
+        // Like the post with reaction URL
+        const res = await fetch(`/api/posts/${currentImage.id}/like`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ reactionUrl })
+        });
+
+        if (res.ok) {
+          const newLikedPosts = new Set(likedPosts);
+          newLikedPosts.add(currentImage.id);
+          setLikedPosts(newLikedPosts);
+          setShowHehe(true);
+          setTimeout(() => setShowHehe(false), 1500);
+
+          currentImage.likes += 1;
+          currentImage.hasLiked = true;
+        } else if (res.status === 401) {
+          localStorage.removeItem('token');
+          router.push('/login');
+        }
       }
     } catch (error) {
       console.error('Error updating like:', error);

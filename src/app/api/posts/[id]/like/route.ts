@@ -31,6 +31,9 @@ export async function POST(
     const params = await context.params;
     const postId = params.id;
 
+    // Get the reaction URL from request body
+    const { reactionUrl } = await request.json();
+
     // Get the post with its author
     const { data: post, error: postError } = await supabase
       .from('Post')
@@ -42,13 +45,14 @@ export async function POST(
       return NextResponse.json({ error: 'Post not found' }, { status: 404 });
     }
 
-    // Create like
+    // Create like with reaction URL
     const { data: like, error: likeError } = await supabase
       .from('Like')
       .insert({
         id: uuidv4(),
         postId,
         userId: payload.userId,
+        reaction_image_url: reactionUrl,
         createdAt: new Date().toISOString()
       })
       .select()
