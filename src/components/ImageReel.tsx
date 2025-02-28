@@ -41,6 +41,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
   const [mintedTokenId, setMintedTokenId] = useState<string>();
   const [isWalletReady, setIsWalletReady] = useState(false);
   const [direction, setDirection] = useState(0);
+  const [faceApiLoaded, setFaceApiLoaded] = useState(false);
 
   const currentImage = imagesState[currentIndex];
 
@@ -292,12 +293,134 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
     setLikedPosts(initialLikedPosts);
   }, [images]);
 
-  useEffect(() => {
-    // Check if we're near the end and should load more
-    if (currentIndex >= imagesState.length - 2) {
-      onEndReached();
+  // useEffect(() => {
+  //   // Check if we're near the end and should load more
+  //   if (currentIndex >= imagesState.length - 2) {
+  //     onEndReached();
+  //   }
+  //   console.log("meme has changed!!!!!!!!!!!!!!!")
+
+  // }, [currentIndex, imagesState.length, onEndReached]);
+// useEffect(() => {
+//   if (currentIndex >= imagesState.length - 2) {
+//     onEndReached();
+//   }
+
+//   console.log("meme has changed!!!!!!!!!!!!!!!");
+
+//   // Wait for 1 second before capturing the screenshot
+//   const timeout = setTimeout(async () => {
+//     const canvas = document.createElement("canvas");
+//     const video = document.getElementById("video") as HTMLVideoElement;
+//     if (!video) return;
+
+//     canvas.width = video.videoWidth;
+//     canvas.height = video.videoHeight;
+//     const ctx = canvas.getContext("2d");
+//     if (!ctx) return;
+
+//     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+//     // Run face detection
+//     const detections = await faceapi
+//       .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+//       .withFaceLandmarks()
+//       .withFaceExpressions();
+
+//     faceapi.draw.drawDetections(canvas, detections);
+//     faceapi.draw.drawFaceLandmarks(canvas, detections);
+//     faceapi.draw.drawFaceExpressions(canvas, detections);
+
+//     // Get the most probable emotion
+//     if (detections.length > 0) {
+//       const emotions = detections[0].expressions;
+//       const mostProbableEmotion = Object.keys(emotions).reduce((a, b) =>
+//         emotions[a] > emotions[b] ? a : b
+//       );
+//       console.log("Most probable emotion:", mostProbableEmotion);
+//     }
+
+//     // Add screenshot to page
+//     document.body.appendChild(canvas);
+//   }, 1000);
+
+//   return () => clearTimeout(timeout);
+// }, [currentIndex, imagesState.length, onEndReached]);
+
+useEffect(() => {
+  const script = document.createElement("script");
+  script.src = "/face-api.min.js";
+  script.async = true;
+  script.onload = () => setFaceApiLoaded(true);
+  document.body.appendChild(script);
+
+  return () => {
+    document.body.removeChild(script);
+  };
+}, []);
+
+useEffect(() => {
+  if (!faceApiLoaded) return;
+
+  async function loadModelsAndStartVideo() {
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri("/models"),
+      faceapi.nets.faceLandmark68Net.loadFromUri("/models"),
+      faceapi.nets.faceRecognitionNet.loadFromUri("/models"),
+      faceapi.nets.faceExpressionNet.loadFromUri("/models"),
+    ]);
+
+    startVideo();
+  }
+
+  loadModelsAndStartVideo();
+}, [faceApiLoaded]);
+
+const startVideo = () => {
+  navigator.mediaDevices
+    .getUserMedia({ video: true })
+    .then((stream) => {
+      const video = document.getElementById("video") as HTMLVideoElement;
+      if (video) video.srcObject = stream;
+    })
+    .catch((err) => console.error("Camera access error:", err));
+};
+
+useEffect(() => {
+  if (!faceApiLoaded) return;
+
+  console.log("meme has changed!!!!!!!!!!!!!!!");
+
+  const timeout = setTimeout(async () => {
+    const video = document.getElementById("video") as HTMLVideoElement;
+    const canvas = document.createElement("canvas");
+    if (!video) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const detections = await faceapi
+      .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks()
+      .withFaceExpressions();
+
+    if (detections.length > 0) {
+      const emotions = detections[0].expressions;
+      const mostProbableEmotion = Object.keys(emotions).reduce((a, b) =>
+        emotions[a] > emotions[b] ? a : b
+      );
+      console.log("Most probable emotion:", mostProbableEmotion);
     }
-  }, [currentIndex, imagesState.length, onEndReached]);
+  }, 1000);
+
+  return () => clearTimeout(timeout);
+}, [currentIndex]);
+
+
 
   if (!mounted) return null;
 
