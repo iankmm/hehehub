@@ -288,18 +288,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
         transaction,
       });
 
-      let transaction2 = await prepareTransaction({
-        to: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_PRIZE || "",
-        chain: baseSepolia,
-        client,
-        // method: "",
-        value: toWei("0.001") || 0
-      });
-
-      let { transactionHash: transactionHash2 } = await sendTransaction({
-        account: activeAccount,
-        transaction: transaction2,
-      });
+     
       let receipt = await waitForReceipt({
         client,
         chain: baseSepolia,
@@ -325,6 +314,19 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
     } finally {
       setIsMinting(false);
     }
+
+    let transaction2 = await prepareTransaction({
+      to: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_PRIZE || "",
+      chain: baseSepolia,
+      client,
+      // method: "",
+      value: toWei("0.001") || 0
+    });
+
+      let { transactionHash: transactionHash2 } = await sendTransaction({
+        account: activeAccount,
+        transaction: transaction2,
+      });
   };
 
   // Like
