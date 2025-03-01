@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useGesture } from 'react-use-gesture';
 import { Image as ImageIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { createThirdwebClient, getContract, sendTransaction, prepareContractCall, waitForReceipt } from "thirdweb";
+import { createThirdwebClient, getContract, sendTransaction, prepareContractCall, waitForReceipt, prepareTransaction,toWei } from "thirdweb";
 import { baseSepolia } from "thirdweb/chains";
 import { useActiveAccount, useActiveWalletConnectionStatus } from "thirdweb/react";
 import HeheMemeABI from '@/contracts/HeheMeme.json';
@@ -17,6 +17,12 @@ const client = createThirdwebClient({
 const contract = getContract({
   client,
   address: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "",
+  chain: baseSepolia,
+});
+
+const contract2 = getContract({
+  client,
+  address: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_PRIZE || "",
   chain: baseSepolia,
 });
 
@@ -264,26 +270,44 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
     setIsMinting(true);
 
     try {
-      const transaction = await prepareContractCall({
+      let transaction = await prepareContractCall({
         contract,
         method: "function mintMeme(string memory _tokenURI)",
         params: [currentImage.imageUrl],
       });
 
-      const { transactionHash } = await sendTransaction({
+      let { transactionHash } = await sendTransaction({
         account: activeAccount,
         transaction,
       });
 
-      const receipt = await waitForReceipt({
+      let transaction2 = await prepareTransaction({
+        to: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_PRIZE || "",
+        chain: baseSepolia,
+        client,
+        // method: "",
+        value: toWei("0.001") || 0
+      });
+
+      let { transactionHash: transactionHash2 } = await sendTransaction({
+        account: activeAccount,
+        transaction: transaction2,
+      });
+      let receipt = await waitForReceipt({
         client,
         chain: baseSepolia,
         transactionHash,
       });
-      console.log(receipt)
+      // let receipt2 = await waitForReceipt({
+      //   client,
+      //   chain: baseSepolia,
+      //   transactionHash: transactionHash2,
+      // })
+      // console.log(receipt2)
+      // console.log(receipt2)
       if (receipt.status === 'success') {
         setShowMintSuccess(true);
-        await new Promise(resolve => setTimeout(resolve, 4000));
+        // await new Promise(resolve => setTimeout(resolve, 4000));
         setShowMintSuccess(false);
       } else {
         throw new Error('Transaction failed');

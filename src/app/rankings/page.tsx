@@ -3,6 +3,10 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Crown, Trophy, Medal, ChevronLeft, ChevronRight } from 'lucide-react'
+import { createThirdwebClient, getContract } from "thirdweb";
+import { baseSepolia } from "thirdweb/chains";
+import { useReadContract } from "thirdweb/react";
+
 
 interface User {
   id: string
@@ -10,7 +14,9 @@ interface User {
   heheScore: number
   avatarUrl?: string
 }
-
+let client = createThirdwebClient({
+  clientId: "8e1035b064454b1b9505e0dd626a8555"
+})
 const USERS_PER_PAGE = 10
 
 export default function RankingsPage() {
@@ -18,6 +24,25 @@ export default function RankingsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [prizePool, setPrizePool] = useState<string>("0")
+
+  const contract = getContract({
+    client,
+    address: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_PRIZE!,
+    chain: baseSepolia,
+  });
+
+  const { data: prizePoolBalance } = useReadContract({
+    contract,
+    method: "function getPrizePool() view returns (uint256)",
+    params: [],
+  });
+
+  useEffect(() => {
+    if (prizePoolBalance) {
+      setPrizePool(prizePoolBalance.toString())
+    }
+  }, [prizePoolBalance])
 
   const totalPages = Math.ceil((users.length - 3) / USERS_PER_PAGE)
   const startIndex = 3 + (currentPage - 1) * USERS_PER_PAGE
@@ -50,8 +75,29 @@ export default function RankingsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#1f1f1f] p-4">
-        <h1 className="text-3xl font-bold text-white text-center mb-8">Meme Lords</h1>
+        <h1 className="text-3xl font-bold text-white text-center mb-4">Meme Lords</h1>
         
+        {/* Prize Pool Display */}
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold text-white mb-2">
+            Prize Pool: <span className="text-green-400 animate-pulse">0 ETH</span>
+          </h2>
+          <div className="flex justify-center gap-8 text-lg">
+            <div>
+              <span className="text-white">1st Place: </span>
+              <span className="text-green-400 animate-pulse">0 ETH</span>
+            </div>
+            <div>
+              <span className="text-white">2nd Place: </span>
+              <span className="text-green-400 animate-pulse">0 ETH</span>
+            </div>
+            <div>
+              <span className="text-white">3rd Place: </span>
+              <span className="text-green-400 animate-pulse">0 ETH</span>
+            </div>
+          </div>
+        </div>
+
         {/* Top 3 Loading Skeletons */}
         <div className="grid grid-cols-3 gap-4 max-w-4xl mx-auto mb-12">
           {/* Second Place Skeleton */}
@@ -113,8 +159,29 @@ export default function RankingsPage() {
 
   return (
     <div className="min-h-screen bg-[#1f1f1f] p-4">
-      <h1 className="text-3xl font-bold text-white text-center mb-8">Meme Lords</h1>
+      <h1 className="text-3xl font-bold text-white text-center mb-4">Meme Lords</h1>
       
+      {/* Prize Pool Display */}
+      <div className="text-center mb-8">
+        <h2 className="text-2xl font-bold text-white mb-2">
+          Prize Pool: <span className="text-green-400 animate-pulse">{Number(prizePool) / 1e18} ETH</span>
+        </h2>
+        <div className="flex justify-center gap-8 text-lg">
+          <div>
+            <span className="text-white">1st Place: </span>
+            <span className="text-green-400 animate-pulse">{(Number(prizePool) * 0.5 / 1e18).toFixed(4)} ETH</span>
+          </div>
+          <div>
+            <span className="text-white">2nd Place: </span>
+            <span className="text-green-400 animate-pulse">{(Number(prizePool) * 0.3 / 1e18).toFixed(4)} ETH</span>
+          </div>
+          <div>
+            <span className="text-white">3rd Place: </span>
+            <span className="text-green-400 animate-pulse">{(Number(prizePool) * 0.2 / 1e18).toFixed(4)} ETH</span>
+          </div>
+        </div>
+      </div>
+
       {/* Top 3 Users */}
       <div className="grid grid-cols-3 gap-4 max-w-4xl mx-auto mb-12">
         {/* Second Place */}

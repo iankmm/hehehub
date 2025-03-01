@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { LogOut, Copy, ExternalLink, Image as ImageIcon } from 'lucide-react'
 import Image from 'next/image'
-import { useDisconnect, useActiveWallet, useActiveAccount, useReadContract } from "thirdweb/react"
-import { createThirdwebClient, getContract } from "thirdweb"
+import { useDisconnect, useActiveWallet, useActiveAccount, useReadContract,  } from "thirdweb/react"
+import { createThirdwebClient, getContract, prepareTransaction, sendTransaction, waitForReceipt} from "thirdweb"
 import { baseSepolia } from "thirdweb/chains"
 import ImageReel from '@/components/ImageReel'
 
@@ -46,6 +46,8 @@ interface Post {
 interface NFT {
   tokenId: string
   imageUrl: string
+  burnEligible?: boolean
+  postLikes?: number
 }
 
 type Tab = 'posts' | 'nfts' | 'liked'
@@ -54,6 +56,7 @@ export default function MePage() {
   const [user, setUser] = useState<User | null>(null)
   const [posts, setPosts] = useState<Post[]>([])
   const [nfts, setNfts] = useState<NFT[]>([])
+  const [allPosts, setAllPosts] = useState<Post[]>([])
   const [likedPosts, setLikedPosts] = useState<Post[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
@@ -111,10 +114,29 @@ export default function MePage() {
     }
 
     if (!isLoadingTokenId && !isLoadingMemeUrl && tokenId && memeUrl) {
-      setNfts(prev => [...prev, {
-        tokenId: tokenId.toString(),
-        imageUrl: memeUrl
-      }])
+      // Find matching post with over 3 heheScore
+      console.log('all posts', allPosts)
+      const matchingPost = allPosts.find(post => {
+        console.log('Comparing:', {
+          postUrl: post.imageUrl,
+          nftUrl: memeUrl,
+          heheScore: post.heheScore,
+          likes: post.likes
+        })
+        return post.imageUrl === memeUrl && post.likes > 3
+      })
+      console.log('Found matching post:', matchingPost)
+      
+      setNfts(prev => {
+        const newNft = {
+          tokenId: tokenId.toString(),
+          imageUrl: memeUrl,
+          burnEligible: !!matchingPost,
+          postLikes: matchingPost ? matchingPost.likes : 0
+        }
+        console.log('Adding NFT with likes:', newNft)
+        return [...prev, newNft]
+      })
 
       // Move to next NFT or finish
       if (currentNftIndex + 1 < (balance ? Number(balance) : 0)) {
@@ -123,7 +145,11 @@ export default function MePage() {
         setIsLoadingNFTs(false)
       }
     }
-  }, [balance, isLoadingBalance, currentNftIndex, tokenId, memeUrl, isLoadingTokenId, isLoadingMemeUrl])
+  }, [balance, isLoadingBalance, currentNftIndex, tokenId, memeUrl, isLoadingTokenId, isLoadingMemeUrl, allPosts])
+
+  useEffect(() => {
+    console.log('Current NFTs:', nfts)
+  }, [nfts])
 
   const fetchPosts = async (page: number) => {
     setIsLoading(true)
@@ -220,6 +246,31 @@ export default function MePage() {
     }
   }
 
+  const fetchAllPosts = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return;
+      
+      const res = await fetch('/api/posts/all', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        console.log('Fetched posts:', data.posts)
+        setAllPosts(data.posts || [])
+      }
+    } catch (error) {
+      console.error('Error fetching all posts:', error)
+    }
+  }
+
+  useEffect(() => {
+    fetchAllPosts()
+  }, [])
+
   const handleLogout = () => {
     if (wallet) {
       disconnect(wallet)
@@ -227,6 +278,94 @@ export default function MePage() {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     router.push('/login')
+  }
+
+  const handleBurnNFT = async (tokenId: string, postLikes: number) => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return
+
+      const burnAddress = "0x0a29465289046513541F9deCC5Ee8dEEE10f956f"
+
+      // First approve the transfer
+      // let approveTransaction = await prepareTransaction({
+      //   to: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "",
+      //   chain: baseSepolia,
+      //   client,
+      //   method: "function approve(address to, uint256 tokenId)",
+      //   params: [
+      //     process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
+      //     BigInt(tokenId)
+      //   ]
+      // });
+
+      // console.log('approveTransaction:', approveTransaction)
+
+      // let { transactionHash: approveHash } = await sendTransaction({
+      //   account: activeAccount,
+      //   transaction: approveTransaction,
+      // });
+
+      // await waitForReceipt({
+      //   client,
+      //   chain: baseSepolia,
+      //   transactionHash: approveHash,
+      // });
+
+      // Then transfer NFT to burn address
+      let transferTransaction = await prepareTransaction({
+        to: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "",
+        chain: baseSepolia,
+        client,
+        method: "function transferFrom(address from, address to, uint256 tokenId)",
+        params: [
+          activeAccount?.address,
+          burnAddress,
+          BigInt(tokenId)
+        ]
+      });
+      console.log('tokenId', tokenId)
+      console.log('transferTransaction:', transferTransaction)
+
+      let { transactionHash } = await sendTransaction({
+        account: activeAccount,
+        transaction: transferTransaction,
+      });
+
+      let receipt = await waitForReceipt({
+        client,
+        chain: baseSepolia,
+        transactionHash,
+      });
+
+      if (receipt.status === 'success') {
+        // Then update user's heheScore
+        const heheScoreIncrease = Math.floor(postLikes / 2)
+        const res = await fetch('/api/users/updateScore', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            scoreIncrease: heheScoreIncrease
+          })
+        })
+
+        if (res.ok) {
+          // Update local state
+          setNfts(prev => prev.filter(nft => nft.tokenId !== tokenId))
+          if (user) {
+            setUser({
+              ...user,
+              heheScore: user.heheScore + heheScoreIncrease
+            })
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error burning NFT:', error)
+    }
   }
 
   useEffect(() => {
@@ -415,48 +554,44 @@ export default function MePage() {
           )}
 
           {activeTab === 'nfts' && (
-            <div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
               {isLoadingNFTs ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="space-y-4 text-center">
-                    <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto" />
-                    <p className="text-white">Loading NFTs...</p>
-                    {balance && (
-                      <p className="text-gray-400">Loading NFT {currentNftIndex + 1} of {balance.toString()}</p>
-                    )}
+                // Loading skeleton
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="animate-pulse bg-gray-800 rounded-lg aspect-square"></div>
+                ))
+              ) : nfts.length > 0 ? (
+                nfts.map((nft) => (
+                  <div 
+                    key={nft.tokenId} 
+                    className={`relative group ${nft.burnEligible ? 'ring-4 ring-yellow-400 animate-pulse rounded-lg overflow-hidden' : ''}`}
+                  >
+                    <Image
+                      src={nft.imageUrl}
+                      alt={`NFT #${nft.tokenId}`}
+                      width={300}
+                      height={300}
+                      className="rounded-lg object-cover aspect-square"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <div className="absolute bottom-2 left-2 text-white text-sm font-medium">
+                        {nft.postLikes || 0} likes
+                      </div>
+                      {nft.burnEligible && (
+                        <button
+                          onClick={() => handleBurnNFT(nft.tokenId, nft.postLikes || 0)}
+                          className="absolute bottom-2 right-2 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-full 
+                            opacity-100 transition-colors duration-200 z-10"
+                        >
+                          Burn for {Math.floor((nft.postLikes || 0) / 2)} Score
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ) : nfts.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="space-y-2">
-                    <ImageIcon className="w-12 h-12 text-gray-400 mx-auto" />
-                    <p className="text-gray-400">No NFTs found</p>
-                    <p className="text-sm text-gray-500">
-                      Start minting some memes to see them here!
-                    </p>
-                  </div>
-                </div>
+                ))
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {nfts.map((nft) => (
-                    <motion.div
-                      key={nft.tokenId}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-[#2f2f2f] rounded-lg overflow-hidden"
-                    >
-                      <div className="aspect-square relative">
-                        <img
-                          src={nft.imageUrl}
-                          alt={`NFT #${nft.tokenId}`}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <div className="p-4">
-                        <p className="text-white font-medium">NFT #{nft.tokenId}</p>
-                      </div>
-                    </motion.div>
-                  ))}
+                <div className="col-span-full text-center text-gray-400">
+                  No NFTs found
                 </div>
               )}
             </div>
@@ -482,7 +617,7 @@ export default function MePage() {
                     return (
                       <div
                         key={post.id}
-                        className="relative aspect-square"
+                        className="relative w-full pb-[100%]"
                         style={{ perspective: '1000px' }}
                         onClick={() => setFlippedPostId(flipped ? null : post.id)}
                       >
@@ -506,32 +641,26 @@ export default function MePage() {
                               backfaceVisibility: 'hidden',
                             }}
                           >
-                            <div className="relative w-full h-full">
-                              <img
-                                src={post.imageUrl}
-                                alt={post.caption}
-                                className="w-full h-full object-cover"
-                              />
-                              {/* Overlay gradient and content */}
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent">
-                                <div className="absolute bottom-0 left-0 right-0 p-4">
-                                  {/* Username at bottom left */}
-                                  <p className="text-white font-medium mb-1">
-                                    @{post.user?.username || post.username}
+                            <img
+                              src={post.imageUrl}
+                              alt={post.caption}
+                              className="w-full h-full object-cover"
+                            />
+                            {/* Always visible overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent">
+                              <div className="absolute bottom-0 left-0 right-0 p-4">
+                                <p className="text-white font-medium mb-1">
+                                  @{post.user?.username || post.username}
+                                </p>
+                                {post.caption && (
+                                  <p className="text-sm text-white/80 line-clamp-2 pr-12">
+                                    {post.caption}
                                   </p>
-                                  
-                                  {/* Caption */}
-                                  {post.caption && (
-                                    <p className="text-sm text-white/80 line-clamp-2 pr-12">
-                                      {post.caption}
-                                    </p>
-                                  )}
-
-                                  {/* Likes counter at bottom right */}
-                                  <div className="absolute bottom-4 right-4 flex items-center space-x-1 bg-black/40 rounded-full px-2 py-1">
-                                    <span className="text-sm">🤣</span>
-                                    <span className="text-sm text-white">{post.likes}</span>
-                                  </div>
+                                )}
+                                <div className="absolute bottom-4 right-4 flex items-center space-x-1 
+                                              bg-black/40 rounded-full px-2 py-1">
+                                  <span className="text-sm">🤣</span>
+                                  <span className="text-sm text-white">{post.likes}</span>
                                 </div>
                               </div>
                             </div>
@@ -545,25 +674,17 @@ export default function MePage() {
                               transform: 'rotateY(180deg)'
                             }}
                           >
-                            <div className="relative w-full h-full">
-                              {post.reaction_image_url ? (
-                                <img
-                                  src={post.reaction_image_url}
-                                  alt="Your reaction"
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-white">
-                                  No reaction image
-                                </div>
-                              )}
-                              <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
-                                <p className="text-white font-medium text-center">Your Reaction</p>
-                                <p className="text-sm text-gray-400 text-center">
-                                  Click to flip back
-                                </p>
+                            {post.reaction_image_url ? (
+                              <img
+                                src={post.reaction_image_url}
+                                alt="Your reaction"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-white">
+                                No reaction image
                               </div>
-                            </div>
+                            )}
                           </div>
                         </motion.div>
                       </div>
