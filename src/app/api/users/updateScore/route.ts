@@ -19,10 +19,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid score increase' }, { status: 400 })
     }
 
+    const { data: currentUser, error: fetchError } = await supabase
+      .from('User')
+      .select('heheScore')
+      .eq('id', payload.userId)
+      .single()
+
+    if (fetchError) throw fetchError
+
     const { data: updatedUser, error } = await supabase
       .from('User')
       .update({
-        heheScore: supabase.rpc('increment_score', { amount: scoreIncrease }),
+        heheScore: currentUser.heheScore + scoreIncrease,
         updatedAt: new Date().toISOString()
       })
       .eq('id', payload.userId)

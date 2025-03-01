@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { LogOut, Copy, ExternalLink, Image as ImageIcon } from 'lucide-react'
 import Image from 'next/image'
 import { useDisconnect, useActiveWallet, useActiveAccount, useReadContract,  } from "thirdweb/react"
-import { createThirdwebClient, getContract, prepareTransaction, sendTransaction, waitForReceipt} from "thirdweb"
+import { createThirdwebClient, getContract, prepareContractCall, sendTransaction, waitForReceipt} from "thirdweb"
 import { baseSepolia } from "thirdweb/chains"
 import ImageReel from '@/components/ImageReel'
 
@@ -66,6 +66,8 @@ export default function MePage() {
   const [currentNftIndex, setCurrentNftIndex] = useState<number>(0)
   const [isLoadingNFTs, setIsLoadingNFTs] = useState(true)
   const [flippedPostId, setFlippedPostId] = useState<string | null>(null)
+  const [showScoreNotification, setShowScoreNotification] = useState(false);
+  const [earnedScore, setEarnedScore] = useState(0);
   
   const activeAccount = useActiveAccount()
   const { disconnect } = useDisconnect()
@@ -287,36 +289,9 @@ export default function MePage() {
 
       const burnAddress = "0x0a29465289046513541F9deCC5Ee8dEEE10f956f"
 
-      // First approve the transfer
-      // let approveTransaction = await prepareTransaction({
-      //   to: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "",
-      //   chain: baseSepolia,
-      //   client,
-      //   method: "function approve(address to, uint256 tokenId)",
-      //   params: [
-      //     process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
-      //     BigInt(tokenId)
-      //   ]
-      // });
-
-      // console.log('approveTransaction:', approveTransaction)
-
-      // let { transactionHash: approveHash } = await sendTransaction({
-      //   account: activeAccount,
-      //   transaction: approveTransaction,
-      // });
-
-      // await waitForReceipt({
-      //   client,
-      //   chain: baseSepolia,
-      //   transactionHash: approveHash,
-      // });
-
       // Then transfer NFT to burn address
-      let transferTransaction = await prepareTransaction({
-        to: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "",
-        chain: baseSepolia,
-        client,
+      let transferTransaction = await prepareContractCall({
+        contract,
         method: "function transferFrom(address from, address to, uint256 tokenId)",
         params: [
           activeAccount?.address,
@@ -361,6 +336,11 @@ export default function MePage() {
               heheScore: user.heheScore + heheScoreIncrease
             })
           }
+          
+          // Show score notification
+          setEarnedScore(heheScoreIncrease);
+          setShowScoreNotification(true);
+          setTimeout(() => setShowScoreNotification(false), 3000);
         }
       }
     } catch (error) {
@@ -418,6 +398,23 @@ export default function MePage() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-[#1f1f1f]">
+      {/* Success Notification */}
+      <AnimatePresence>
+        {showScoreNotification && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.5 }}
+            className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none"
+          >
+            <div className="bg-pink-500 text-white px-6 py-4 rounded-lg shadow-xl">
+              <p className="text-xl font-bold">+{earnedScore} HEHE Score!</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Fixed Header Section */}
       <div className="sticky top-0 left-0 right-0 z-10 bg-[#1f1f1f]">
         <div className="relative">
@@ -554,7 +551,7 @@ export default function MePage() {
           )}
 
           {activeTab === 'nfts' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
+            <div className="grid grid-cols-2 gap-4 p-4 overflow-y-auto">
               {isLoadingNFTs ? (
                 // Loading skeleton
                 Array.from({ length: 4 }).map((_, i) => (
@@ -562,31 +559,29 @@ export default function MePage() {
                 ))
               ) : nfts.length > 0 ? (
                 nfts.map((nft) => (
-                  <div 
-                    key={nft.tokenId} 
-                    className={`relative group ${nft.burnEligible ? 'ring-4 ring-yellow-400 animate-pulse rounded-lg overflow-hidden' : ''}`}
-                  >
-                    <Image
-                      src={nft.imageUrl}
-                      alt={`NFT #${nft.tokenId}`}
-                      width={300}
-                      height={300}
-                      className="rounded-lg object-cover aspect-square"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <div className="absolute bottom-2 left-2 text-white text-sm font-medium">
-                        {nft.postLikes || 0} likes
-                      </div>
+                  <div key={nft.tokenId} className="relative group">
+                    <div className="relative rounded-xl overflow-hidden aspect-square">
+                      <Image
+                        src={nft.imageUrl}
+                        alt={`NFT ${nft.tokenId}`}
+                        fill
+                        className="object-cover"
+                      />
                       {nft.burnEligible && (
-                        <button
-                          onClick={() => handleBurnNFT(nft.tokenId, nft.postLikes || 0)}
-                          className="absolute bottom-2 right-2 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-full 
-                            opacity-100 transition-colors duration-200 z-10"
-                        >
-                          Burn for {Math.floor((nft.postLikes || 0) / 2)} Score
-                        </button>
+                        <div className="absolute inset-0 border-[4px] border-pink-500 rounded-xl glow-pink"></div>
                       )}
+                      <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
+                        <p className="text-white text-sm">{nft.postLikes} likes</p>
+                      </div>
                     </div>
+                    {nft.burnEligible && (
+                      <button
+                        onClick={() => handleBurnNFT(nft.tokenId, nft.postLikes || 0)}
+                        className="absolute bottom-2 right-2 bg-pink-500 text-white px-3 py-1 rounded-full text-sm font-medium hover:bg-pink-600 transition-colors"
+                      >
+                        Burn for {Math.floor((nft.postLikes || 0) / 2)} Score
+                      </button>
+                    )}
                   </div>
                 ))
               ) : (
