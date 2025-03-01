@@ -46,10 +46,10 @@ export default function RootLayout({
               <div className="pointer-events-auto">
                 <AutoConnect
                   client={client}
-                  accountAbstraction={{
-                    chain: selectedChain,
-                    sponsorGas: true,
-                  }}
+                  // accountAbstraction={{
+                  //   chain: selectedChain,
+                  //   sponsorGas: true,
+                  // }}
                 />
               </div>
             </div>

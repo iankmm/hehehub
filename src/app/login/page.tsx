@@ -146,10 +146,10 @@ export default function LoginPage() {
           <div className="flex space-y-4 justify-center items-center">
             <ConnectButton
               client={client}
-              accountAbstraction={{
-                chain: selectedChain,
-                sponsorGas: true,
-              }}
+              // accountAbstraction={{
+              //   chain: selectedChain,
+              //   sponsorGas: true,
+              // }}
             />
           </div>
         )}
