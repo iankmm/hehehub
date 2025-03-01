@@ -501,7 +501,7 @@ export default function MePage() {
                         >
                           {/* FRONT SIDE */}
                           <div
-                            className="absolute inset-0 bg-[#2f2f2f] rounded-lg overflow-hidden group"
+                            className="absolute inset-0 bg-[#2f2f2f] rounded-lg overflow-hidden"
                             style={{
                               backfaceVisibility: 'hidden',
                             }}
@@ -511,11 +511,9 @@ export default function MePage() {
                               alt={post.caption}
                               className="w-full h-full object-cover"
                             />
-                            {/* Hover overlay */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent 
-                                          opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                              <div className="absolute bottom-0 left-0 right-0 p-4 
-                                            translate-y-4 group-hover:translate-y-0 transition-transform duration-200">
+                            {/* Always visible overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent">
+                              <div className="absolute bottom-0 left-0 right-0 p-4">
                                 <p className="text-white font-medium mb-1">
                                   @{post.user?.username || post.username}
                                 </p>
@@ -552,12 +550,6 @@ export default function MePage() {
                                 No reaction image
                               </div>
                             )}
-                            <div className="absolute bottom-0 left-0 right-0 p-4 bg-black/50">
-                              <p className="text-white font-medium text-center">Your Reaction</p>
-                              <p className="text-sm text-gray-400 text-center">
-                                Click to flip back
-                              </p>
-                            </div>
                           </div>
                         </motion.div>
                       </div>
