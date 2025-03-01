@@ -7,34 +7,21 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract HeheMeme is ERC721Enumerable, Ownable {
     uint256 private _nextTokenId;
-    address public prizePool;
 
     // Mapping from token ID to meme URL
     mapping(uint256 => string) private _memeUrls;
     
     event MemeMinted(uint256 indexed tokenId, address indexed minter, string memeUrl);
-    event PrizePoolSet(address indexed prizePool);
 
     constructor() ERC721("HeheMeme", "HEHE") {}
 
-    function setPrizePool(address _prizePool) external onlyOwner {
-        require(_prizePool != address(0), "Invalid prize pool address");
-        prizePool = _prizePool;
-        emit PrizePoolSet(_prizePool);
-    }
-
-    function mintMeme(string memory memeUrl) public payable returns (uint256) {
+    function mintMeme(string memory memeUrl) public returns (uint256) {
         require(bytes(memeUrl).length > 0, "URL cannot be empty");
-        require(prizePool != address(0), "Prize pool not set");
         
         uint256 tokenId = _nextTokenId++;
         
         _safeMint(msg.sender, tokenId);
         _memeUrls[tokenId] = memeUrl;
-        
-        // Send the ETH to the prize pool
-        (bool success, ) = prizePool.call{value: msg.value}("");
-        require(success, "Failed to send ETH to prize pool");
         
         emit MemeMinted(tokenId, msg.sender, memeUrl);
         
@@ -44,12 +31,6 @@ contract HeheMeme is ERC721Enumerable, Ownable {
     function getMemeUrl(uint256 tokenId) public view returns (string memory) {
         require(_exists(tokenId), "Token does not exist");
         return _memeUrls[tokenId];
-    }
-
-    function burn(uint256 tokenId) public {
-        require(_isApprovedOrOwner(_msgSender(), tokenId), "Caller is not owner nor approved");
-        _burn(tokenId);
-        delete _memeUrls[tokenId];
     }
 
     function isMemeUrlMinted(string memory memeUrl) public view returns (bool) {

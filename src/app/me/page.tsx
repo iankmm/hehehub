@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LogOut, Copy, ExternalLink, Image as ImageIcon } from 'lucide-react'
 import Image from 'next/image'
-import { useDisconnect, useActiveWallet, useActiveAccount, useReadContract,  } from "thirdweb/react"
-import { createThirdwebClient, getContract, prepareContractCall, sendTransaction, waitForReceipt} from "thirdweb"
+import { useDisconnect, useActiveWallet, useActiveAccount, useReadContract, useContractEvents } from "thirdweb/react"
+import { createThirdwebClient, getContract, prepareContractCall, sendTransaction, waitForReceipt, prepareEvent } from "thirdweb"
 import { baseSepolia } from "thirdweb/chains"
 import ImageReel from '@/components/ImageReel'
 
@@ -18,6 +18,11 @@ const contract = getContract({
   client,
   address: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "",
   chain: baseSepolia,
+});
+
+// Prepare the MemeMinted event
+const memeMintedEvent = prepareEvent({
+  signature: "event MemeMinted(uint256 indexed tokenId, address indexed minter, string memeUrl)"
 });
 
 interface User {
@@ -63,7 +68,6 @@ export default function MePage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [activeTab, setActiveTab] = useState<Tab>('posts')
-  const [currentNftIndex, setCurrentNftIndex] = useState<number>(0)
   const [isLoadingNFTs, setIsLoadingNFTs] = useState(true)
   const [flippedPostId, setFlippedPostId] = useState<string | null>(null)
   const [showScoreNotification, setShowScoreNotification] = useState(false);
@@ -75,97 +79,62 @@ export default function MePage() {
   const wallet = useActiveWallet()
   const router = useRouter()
 
-  // NFT Contract Hooks
-  const { data: balance, isLoading: isLoadingBalance } = useReadContract({
+  // Get NFT mint events using prepared event
+  const { data: events, isLoading: isLoadingEvents } = useContractEvents({
     contract,
-    method: "function balanceOf(address owner) view returns (uint256)",
-    params: activeAccount ? [activeAccount.address] : undefined,
-  })
+    events: [memeMintedEvent],
+    filters: { minter: activeAccount?.address },
+    queryFilter: {
+      fromBlock: 0n,
+      toBlock: "latest"
+    }
+  });
 
-  const { data: tokenId, isLoading: isLoadingTokenId } = useReadContract({
-    contract,
-    method: "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
-    params: activeAccount && typeof currentNftIndex === 'number' ? [activeAccount.address, BigInt(currentNftIndex)] : undefined,
-  })
-
-  const { data: memeUrl, isLoading: isLoadingMemeUrl } = useReadContract({
-    contract,
-    method: "function getMemeUrl(uint256 tokenId) view returns (string)",
-    params: tokenId ? [tokenId] : undefined,
-  })
-
-  // Effect for NFT loading
+  // Effect for loading NFTs from events
   useEffect(() => {
-    if (!activeAccount?.address) {
+    if (!activeAccount?.address || isLoadingEvents || !events) {
       setNfts([])
       setIsLoadingNFTs(false)
       return
     }
 
-    if (!isLoadingBalance && !balance) {
-      setNfts([])
-      setIsLoadingNFTs(false)
-      return
-    }
+    const loadNFTsFromEvents = async () => {
+      setIsLoadingNFTs(true)
+      try {
+        const nftPromises = events.map(async (event) => {
+          const tokenId = event.args.tokenId.toString()
+          const memeUrl = event.args.memeUrl
 
-    setIsLoadingNFTs(true)
-  }, [activeAccount?.address, balance, isLoadingBalance])
+          const matchingPost = allPosts.find(post => {
+            console.log('Comparing:', {
+              postUrl: post.imageUrl,
+              nftUrl: memeUrl,
+              heheScore: post.heheScore,
+              likes: post.likes
+            })
+            return post.imageUrl === memeUrl
+          })
 
-  useEffect(() => {
-    if (
-      !balance ||
-      isLoadingBalance ||
-      currentNftIndex >= (balance ? Number(balance) : 0)
-    ) {
-      return;
-    }
-  
-    if (!isLoadingTokenId && !isLoadingMemeUrl && tokenId && memeUrl) {
-      // Find matching post by exact URL match
-      const matchingPost = allPosts.find((post) => {
-        const cleanPostUrl = post.imageUrl.split('?')[0];
-        const cleanNftUrl = memeUrl.split('?')[0];
-        return cleanPostUrl === cleanNftUrl;
-      });
-  
-      const newTokenId = tokenId.toString();
-      const newNft = {
-        tokenId: newTokenId,
-        imageUrl: memeUrl,
-        burnEligible: true,
-        postLikes: matchingPost?.likes || 0,
-      };
-  
-      setNfts((prev) => {
-        // Only add if an NFT with this tokenId doesn't already exist
-        if (prev.some((nft) => nft.tokenId === newTokenId)) {
-          return prev;
-        }
-        return [...prev, newNft];
-      });
-  
-      // Move to next NFT or finish
-      if (currentNftIndex + 1 < (balance ? Number(balance) : 0)) {
-        setCurrentNftIndex(currentNftIndex + 1);
-      } else {
-        setIsLoadingNFTs(false);
+          return {
+            tokenId,
+            imageUrl: memeUrl,
+            burnEligible: !!matchingPost,
+            postLikes: matchingPost ? matchingPost.likes : 0
+          }
+        })
+
+        const loadedNfts = await Promise.all(nftPromises)
+        console.log('Loaded NFTs from events:', loadedNfts)
+        setNfts(loadedNfts)
+      } catch (error) {
+        console.error('Error loading NFTs from events:', error)
+      } finally {
+        setIsLoadingNFTs(false)
       }
     }
-  }, [
-    balance,
-    isLoadingBalance,
-    currentNftIndex,
-    tokenId,
-    memeUrl,
-    isLoadingTokenId,
-    isLoadingMemeUrl,
-    allPosts,
-  ]);
-  
 
-  useEffect(() => {
-    console.log('Current NFTs:', nfts)
-  }, [nfts])
+    loadNFTsFromEvents()
+  }, [activeAccount?.address, events, isLoadingEvents, allPosts])
 
   const fetchPosts = async (page: number) => {
     setIsLoading(true)
