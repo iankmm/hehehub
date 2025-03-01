@@ -440,10 +440,8 @@ export default function MePage() {
         if (res.ok) {
           // Update local state
           // Wait for animation to complete before removing from state
-          setTimeout(() => {
-            setNfts(prev => prev.filter(nft => nft.tokenId !== tokenId));
-            setBurningNftId(null);
-          }, 3000);
+          setNfts(prev => prev.filter(nft => nft.tokenId !== tokenId));
+          setBurningNftId(null);
           if (user) {
             setUser({
               ...user,
