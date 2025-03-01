@@ -10,7 +10,22 @@ const ImageReel = dynamic(() => import('@/components/ImageReel'), {
   ssr: false,
   loading: () => (
     <div className="fixed inset-0 bg-[#1f1f1f] flex items-center justify-center">
-      <div className="text-center space-y-4">
+      <div className="space-y-6 text-center">
+        <div className="logo-container">
+          <div className="logo-rays" />
+          <div className="logo-shine" />
+          <img 
+            src="/hehehub_logo.png" 
+            alt="HeheHub Logo"
+            className="w-24 h-24 mx-auto relative z-10"
+          />
+          <div className="sparkle" />
+          <div className="sparkle" />
+          <div className="sparkle" />
+          <div className="sparkle" />
+          <div className="sparkle" />
+          <div className="sparkle" />
+        </div>
         <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto" />
         <p className="text-white">Loading memes...</p>
       </div>
@@ -108,7 +123,22 @@ export default function Home() {
   if (isInitializing) {
     return (
       <div className="min-h-screen bg-[#1f1f1f] flex items-center justify-center">
-        <div className="text-center space-y-4">
+        <div className="space-y-6 text-center">
+          <div className="logo-container">
+            <div className="logo-rays" />
+            <div className="logo-shine" />
+            <img 
+              src="/hehehub_logo.png" 
+              alt="HeheHub Logo"
+              className="w-24 h-24 mx-auto relative z-10"
+            />
+            <div className="sparkle" />
+            <div className="sparkle" />
+            <div className="sparkle" />
+            <div className="sparkle" />
+            <div className="sparkle" />
+            <div className="sparkle" />
+          </div>
           <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-white">Loading your feed...</p>
         </div>
