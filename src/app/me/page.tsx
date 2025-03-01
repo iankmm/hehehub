@@ -7,7 +7,8 @@ import { LogOut, Copy, ExternalLink, Image as ImageIcon } from 'lucide-react'
 import Image from 'next/image'
 import { useDisconnect, useActiveWallet, useActiveAccount, useReadContract, useContractEvents } from "thirdweb/react"
 import { createThirdwebClient, getContract, prepareContractCall, sendTransaction, waitForReceipt, prepareEvent } from "thirdweb"
-import { baseSepolia } from "thirdweb/chains"
+// import { baseSepolia } from "thirdweb/chains"
+import { selectedChain } from "@/lib/chains"
 import ImageReel from '@/components/ImageReel'
 
 const client = createThirdwebClient({
@@ -17,7 +18,7 @@ const client = createThirdwebClient({
 const contract = getContract({
   client,
   address: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "",
-  chain: baseSepolia,
+  chain: selectedChain,
 });
 
 // Prepare the events
@@ -415,7 +416,7 @@ export default function MePage() {
 
       let receipt = await waitForReceipt({
         client,
-        chain: baseSepolia,
+        chain: selectedChain,
         transactionHash,
       });
 

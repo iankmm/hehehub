@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Crown, Trophy, Medal, ChevronLeft, ChevronRight } from 'lucide-react'
 import { createThirdwebClient, getContract } from "thirdweb";
-import { baseSepolia } from "thirdweb/chains";
+// import { baseSepolia } from "thirdweb/chains";
+import { selectedChain } from "@/lib/chains";
 import { useReadContract } from "thirdweb/react";
 
 
@@ -29,7 +30,7 @@ export default function RankingsPage() {
   const contract = getContract({
     client,
     address: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_PRIZE!,
-    chain: baseSepolia,
+    chain: selectedChain,
   });
 
   const { data: prizePoolBalance } = useReadContract({

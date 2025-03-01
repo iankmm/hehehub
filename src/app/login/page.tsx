@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Laugh, MessageCircle, Trophy, WalletIcon } from 'lucide-react'
 import { createThirdwebClient } from "thirdweb";
-import { baseSepolia } from "thirdweb/chains";
+// import { baseSepolia } from "thirdweb/chains";
+import { selectedChain } from "@/lib/chains";
 import { ConnectButton, useActiveAccount, useActiveWalletConnectionStatus } from "thirdweb/react";
 
 const client = createThirdwebClient({
@@ -146,7 +147,7 @@ export default function LoginPage() {
             <ConnectButton
               client={client}
               accountAbstraction={{
-                chain: baseSepolia,
+                chain: selectedChain,
                 sponsorGas: true,
               }}
             />

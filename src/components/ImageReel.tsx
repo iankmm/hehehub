@@ -5,7 +5,8 @@ import { useGesture } from 'react-use-gesture';
 import { Image as ImageIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createThirdwebClient, getContract, sendTransaction, prepareContractCall, waitForReceipt, prepareTransaction,toWei } from "thirdweb";
-import { baseSepolia } from "thirdweb/chains";
+// import { baseSepolia } from "thirdweb/chains";
+import { selectedChain } from "@/lib/chains";
 import { useActiveAccount, useActiveWalletConnectionStatus } from "thirdweb/react";
 import HeheMemeABI from '@/contracts/HeheMeme.json';
 import { Check } from 'lucide-react';
@@ -17,13 +18,13 @@ const client = createThirdwebClient({
 const contract = getContract({
   client,
   address: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "",
-  chain: baseSepolia,
+  chain: selectedChain,
 });
 
 const contract2 = getContract({
   client,
   address: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_PRIZE || "",
-  chain: baseSepolia,
+  chain: selectedChain,
 });
 
 interface Post {
@@ -291,7 +292,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
      
       let receipt = await waitForReceipt({
         client,
-        chain: baseSepolia,
+        chain: selectedChain,
         transactionHash,
       });
       // let receipt2 = await waitForReceipt({
@@ -317,7 +318,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
 
     let transaction2 = await prepareTransaction({
       to: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_PRIZE || "",
-      chain: baseSepolia,
+      chain: selectedChain,
       client,
       // method: "",
       value: toWei("0.001") || 0

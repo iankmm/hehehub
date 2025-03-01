@@ -8,7 +8,8 @@ import BottomNav from '@/components/BottomNav'
 import { ThirdwebProvider } from "thirdweb/react";
 import { AutoConnect } from "thirdweb/react";
 import { inAppWallet } from "thirdweb/wallets";
-import { baseSepolia } from "thirdweb/chains";
+// import { baseSepolia } from "thirdweb/chains";
+import { selectedChain } from "@/lib/chains";
 import { createThirdwebClient } from 'thirdweb'
 import Script from 'next/script' // <-- import Script
 
@@ -46,7 +47,7 @@ export default function RootLayout({
                 <AutoConnect
                   client={client}
                   accountAbstraction={{
-                    chain: baseSepolia,
+                    chain: selectedChain,
                     sponsorGas: true,
                   }}
                 />
