@@ -79,7 +79,7 @@ export default function MePage() {
   const { data: tokenId, isLoading: isLoadingTokenId } = useReadContract({
     contract,
     method: "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
-    params: activeAccount ? [activeAccount.address, BigInt(currentNftIndex)] : undefined,
+    params: activeAccount && typeof currentNftIndex === 'number' ? [activeAccount.address, BigInt(currentNftIndex)] : undefined,
   })
 
   const { data: memeUrl, isLoading: isLoadingMemeUrl } = useReadContract({
@@ -106,7 +106,7 @@ export default function MePage() {
   }, [activeAccount?.address, balance, isLoadingBalance])
 
   useEffect(() => {
-    if (!balance || isLoadingBalance || currentNftIndex >= Number(balance)) {
+    if (!balance || isLoadingBalance || currentNftIndex >= (balance ? Number(balance) : 0)) {
       return
     }
 
@@ -117,7 +117,7 @@ export default function MePage() {
       }])
 
       // Move to next NFT or finish
-      if (currentNftIndex + 1 < Number(balance)) {
+      if (currentNftIndex + 1 < (balance ? Number(balance) : 0)) {
         setCurrentNftIndex(currentNftIndex + 1)
       } else {
         setIsLoadingNFTs(false)
@@ -482,12 +482,12 @@ export default function MePage() {
                     return (
                       <div
                         key={post.id}
-                        className="card-wrapper relative w-full pb-[100%]"
+                        className="relative w-full pb-[100%]"
                         style={{ perspective: '1000px' }}
                         onClick={() => setFlippedPostId(flipped ? null : post.id)}
                       >
                         <motion.div
-                          className="card-inner absolute inset-0"
+                          className="absolute inset-0"
                           style={{
                             transformStyle: 'preserve-3d',
                           }}
@@ -501,37 +501,33 @@ export default function MePage() {
                         >
                           {/* FRONT SIDE */}
                           <div
-                            className="card-front bg-[#2f2f2f] rounded-lg overflow-hidden absolute inset-0"
+                            className="absolute inset-0 bg-[#2f2f2f] rounded-lg overflow-hidden group"
                             style={{
                               backfaceVisibility: 'hidden',
                             }}
                           >
-                            <div className="relative h-full">
-                              <img
-                                src={post.imageUrl}
-                                alt={post.caption}
-                                className="w-full h-full object-cover"
-                              />
-                              {/* Overlay gradient and content */}
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent">
-                                <div className="absolute bottom-0 left-0 right-0 p-4">
-                                  {/* Username at bottom left */}
-                                  <p className="text-white font-medium mb-1">
-                                    @{post.user?.username || post.username}
+                            <img
+                              src={post.imageUrl}
+                              alt={post.caption}
+                              className="w-full h-full object-cover"
+                            />
+                            {/* Hover overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent 
+                                          opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                              <div className="absolute bottom-0 left-0 right-0 p-4 
+                                            translate-y-4 group-hover:translate-y-0 transition-transform duration-200">
+                                <p className="text-white font-medium mb-1">
+                                  @{post.user?.username || post.username}
+                                </p>
+                                {post.caption && (
+                                  <p className="text-sm text-white/80 line-clamp-2 pr-12">
+                                    {post.caption}
                                   </p>
-                                  
-                                  {/* Caption */}
-                                  {post.caption && (
-                                    <p className="text-sm text-white/80 line-clamp-2 pr-12">
-                                      {post.caption}
-                                    </p>
-                                  )}
-
-                                  {/* Likes counter at bottom right */}
-                                  <div className="absolute bottom-4 right-4 flex items-center space-x-1 bg-black/40 rounded-full px-2 py-1">
-                                    <span className="text-sm">🤣</span>
-                                    <span className="text-sm text-white">{post.likes}</span>
-                                  </div>
+                                )}
+                                <div className="absolute bottom-4 right-4 flex items-center space-x-1 
+                                              bg-black/40 rounded-full px-2 py-1">
+                                  <span className="text-sm">🤣</span>
+                                  <span className="text-sm text-white">{post.likes}</span>
                                 </div>
                               </div>
                             </div>
@@ -539,7 +535,7 @@ export default function MePage() {
 
                           {/* BACK SIDE */}
                           <div
-                            className="card-back bg-[#2f2f2f] rounded-lg overflow-hidden absolute inset-0"
+                            className="absolute inset-0 bg-[#2f2f2f] rounded-lg overflow-hidden"
                             style={{
                               backfaceVisibility: 'hidden',
                               transform: 'rotateY(180deg)'
@@ -556,7 +552,7 @@ export default function MePage() {
                                 No reaction image
                               </div>
                             )}
-                            <div className="p-4">
+                            <div className="absolute bottom-0 left-0 right-0 p-4 bg-black/50">
                               <p className="text-white font-medium text-center">Your Reaction</p>
                               <p className="text-sm text-gray-400 text-center">
                                 Click to flip back
