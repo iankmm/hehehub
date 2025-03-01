@@ -14,7 +14,7 @@ Users can also mint NFTs from their most favorite memes, and keep a record of th
 - build a decentralized social network ethstorage
 
 
-## maybe bounties
+## Maybe bounties
 - integrate story in your dapp
 - okto dapps
 - address based meme token behavior alert
