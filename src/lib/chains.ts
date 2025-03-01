@@ -7,7 +7,7 @@ const ink = defineChain(763373);
 
 
   
-// export const selectedChain = baseSepolia;
+export const selectedChain = baseSepolia;
 // export const selectedChain = zkSyncSepolia;
 // export const selectedChain = flow;
-export const selectedChain = ink;
+// export const selectedChain = ink;
