@@ -579,10 +579,31 @@ export default function MePage() {
                   <p className="text-gray-400">No posts yet</p>
                 </div>
               ) : (
-                <ImageReel 
-                  images={posts} 
-                  onEndReached={() => {}} 
-                />
+                <div className="grid grid-cols-2 gap-4 p-4">
+                  {posts.map((post) => (
+                    <div key={post.id} className="relative rounded-xl overflow-hidden aspect-square">
+                      <Image
+                        src={post.imageUrl}
+                        alt={post.caption || "Post image"}
+                        fill
+                        className="object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent">
+                        <div className="absolute bottom-0 left-0 right-0 p-4">
+                          <div className="flex items-center justify-between">
+                            <p className="text-white text-sm font-medium">
+                              @{post.user?.username || post.username || user?.username}
+                            </p>
+                            <div className="flex items-center space-x-1 bg-black/40 rounded-full px-2 py-1">
+                              <span className="text-sm">🤣</span>
+                              <span className="text-sm text-white">{post.likes}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}
