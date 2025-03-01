@@ -65,6 +65,43 @@ async function upload_image_supabase(file: File) {
   }
 }
 
+async function upload_image_ipfs(file: File) {
+  try {
+    // Generate unique file name
+    const ext = file.name.split('.').pop()
+    const fileName = `${uuidv4()}.${ext}`
+
+    // Convert File to Buffer
+    const bytes = await file.arrayBuffer()
+    const buffer = Buffer.from(bytes)
+
+    // Upload to Supabase Storage
+    const { data, error } = await supabase
+      .storage
+      .from('memes')
+      .upload(fileName, buffer, {
+        contentType: file.type,
+        cacheControl: '3600',
+        upsert: false
+      })
+
+    if (error) throw error
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase
+      .storage
+      .from('memes')
+      .getPublicUrl(fileName)
+    
+    console.log("publicUrl", publicUrl)
+
+    return publicUrl
+  } catch (error) {
+    console.error('Supabase upload error:', error)
+    throw error
+  }
+}
+
 export async function POST(request: Request) {
   try {
     // Check auth first
