@@ -56,6 +56,42 @@ html, body {
   100% { opacity: 0; transform: translate(-50%, -10px); }
 }
 
+@keyframes shine {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+}
+
+@keyframes rays {
+  0% {
+    transform: rotate(0deg) scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: rotate(180deg) scale(1.1);
+    opacity: 0.4;
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+    opacity: 0.3;
+  }
+}
+
+@keyframes sparkle {
+  0% { opacity: 0; transform: scale(0) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(180deg); }
+  100% { opacity: 0; transform: scale(0) rotate(360deg); }
+}
+
 .animate-gradient {
   background-size: 200% 200%;
   animation: gradient 6s ease infinite;
@@ -108,6 +144,108 @@ body {
 .backface-hidden {
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
+}
+
+.logo-container {
+  position: relative;
+  display: inline-block;
+}
+
+.logo-shine {
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(circle, rgba(236, 72, 153, 0.2) 0%, transparent 70%);
+  animation: shine 3s ease-in-out infinite;
+}
+
+.logo-rays {
+  position: absolute;
+  inset: -50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(236, 72, 153, 0.05) 5deg,
+    rgba(236, 72, 153, 0.1) 10deg,
+    transparent 15deg,
+    transparent 40deg,
+    rgba(236, 72, 153, 0.05) 45deg,
+    rgba(236, 72, 153, 0.1) 50deg,
+    transparent 55deg,
+    transparent 85deg,
+    rgba(236, 72, 153, 0.05) 90deg,
+    rgba(236, 72, 153, 0.1) 95deg,
+    transparent 100deg,
+    transparent 130deg,
+    rgba(236, 72, 153, 0.05) 135deg,
+    rgba(236, 72, 153, 0.1) 140deg,
+    transparent 145deg,
+    transparent 175deg,
+    rgba(236, 72, 153, 0.05) 180deg,
+    rgba(236, 72, 153, 0.1) 185deg,
+    transparent 190deg,
+    transparent 220deg,
+    rgba(236, 72, 153, 0.05) 225deg,
+    rgba(236, 72, 153, 0.1) 230deg,
+    transparent 235deg
+  );
+  animation: rays 15s linear infinite;
+  filter: blur(3px);
+}
+
+.sparkle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  box-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.3);
+  animation: sparkle 2s ease-in-out infinite;
+}
+
+/* Randomized sparkle positions */
+.sparkle:nth-child(1) { 
+  top: -5%; 
+  left: 45%; 
+  animation-delay: 0s;
+  width: 8px;
+  height: 8px;
+}
+.sparkle:nth-child(2) { 
+  top: 15%; 
+  right: -5%; 
+  animation-delay: 0.7s;
+  width: 5px;
+  height: 5px;
+}
+.sparkle:nth-child(3) { 
+  bottom: -8%; 
+  left: 35%; 
+  animation-delay: 1.4s;
+  width: 7px;
+  height: 7px;
+}
+.sparkle:nth-child(4) { 
+  top: 30%; 
+  left: -8%; 
+  animation-delay: 0.2s;
+  width: 6px;
+  height: 6px;
+}
+
+/* Add more sparkles */
+.sparkle:nth-child(5) { 
+  top: 60%; 
+  right: 10%; 
+  animation-delay: 1.1s;
+  width: 4px;
+  height: 4px;
+}
+.sparkle:nth-child(6) { 
+  top: 20%; 
+  left: 20%; 
+  animation-delay: 0.5s;
+  width: 5px;
+  height: 5px;
 }
 
 .glow-pink {
