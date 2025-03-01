@@ -62,6 +62,7 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
   const [showMintSuccess, setShowMintSuccess] = useState(false);
   const [isWalletReady, setIsWalletReady] = useState(false);
   const [direction, setDirection] = useState(0);
+  const [showMintConfirmation, setShowMintConfirmation] = useState(false);
 
   // === ADDED for face detection ===
   const [timeElapsed, setTimeElapsed] = useState(0);
@@ -252,6 +253,12 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
       return;
     }
 
+    // Add like threshold check
+    if (currentImage.likes >= 7) {
+      console.log("Cannot mint NFT - post has too many likes")
+      return;
+    }
+
     console.log('Mint clicked:', { 
       connectionStatus, 
       address: activeAccount?.address,
@@ -306,9 +313,10 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
       // console.log(receipt2)
       // console.log(receipt2)
       if (receipt.status === 'success') {
-        setShowMintSuccess(true);
-        // await new Promise(resolve => setTimeout(resolve, 4000));
-        setShowMintSuccess(false);
+        setShowMintConfirmation(true);
+        setTimeout(() => {
+          setShowMintConfirmation(false);
+        }, 3000);
       } else {
         throw new Error('Transaction failed');
       }
@@ -458,6 +466,11 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
 
   const REACTION_TIMER_SECONDS = 5; // 5-second timer
 
+  // First, create a helper function to determine if minting is allowed
+  const canMint = (post: Post) => {
+    return likedPosts.has(post.id) && post.likes < 7;
+  };
+
   return (
     <div className="fixed inset-0 bg-black">
       <div 
@@ -537,17 +550,22 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
               <div className="absolute right-4 bottom-32 flex flex-col items-center gap-6">
                 <button
                   onClick={handleMint}
-                  disabled={isMinting}
-                  className="bg-pink-500 text-white rounded-full p-3 
-                           hover:bg-pink-600 transition-all duration-200 
-                           flex items-center justify-center
-                           relative group"
+                  disabled={!canMint(currentImage) || isMinting}
+                  className={`bg-pink-500 text-white rounded-full p-3 
+                              hover:bg-pink-600 transition-all duration-200 
+                              flex items-center justify-center
+                              relative group
+                              ${!canMint(currentImage) ? 'cursor-not-allowed opacity-50' : ''}`}
                   title={connectionStatus === 'connected' ? 'Mint as NFT' : 'Connect wallet to mint'}
                 >
                   {isMinting ? (
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
+                  ) : canMint(currentImage) ? (
                     <ImageIcon className="w-5 h-5" />
+                  ) : (
+                    <div className="flex items-center space-x-2 opacity-50 ">
+                      <ImageIcon className="w-5 h-5" />
+                    </div>
                   )}
                   <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs py-1 px-2 rounded
                                 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
@@ -639,6 +657,20 @@ export default function ImageReel({ images, onEndReached }: ImageReelProps) {
         muted
         playsInline
       />
+
+      {showMintConfirmation && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none"
+        >
+          <div className="bg-green-500 text-white px-6 py-4 rounded-lg shadow-xl flex items-center space-x-2">
+            <Check className="w-5 h-5" />
+            <p className="text-lg font-medium">Successfully minted NFT!</p>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }
