@@ -217,7 +217,28 @@ export default function MePage() {
         throw new Error(data.error)
       }
 
-      setPosts(data.posts || [])
+      // Enhanced normalization for posts
+      let postsArray: Post[] = []
+      const rawPosts = Array.isArray(data.posts) ? data.posts : Array.isArray(data) ? data : []
+      postsArray = rawPosts
+        .filter(post => post && typeof post === 'object') // Ensure post is an object
+        .map((post: any) => ({
+          id: post.id || post.postId || post.userId || `${Math.random()}`, // Handle userId as a fallback
+          imageUrl: post.imageUrl || '',
+          caption: post.caption || '',
+          likes: typeof post.likes === 'number' ? post.likes : 0,
+          username: post.username || post.user?.username || 'Unknown',
+          heheScore: typeof post.heheScore === 'number' ? post.heheScore : 0,
+          hasLiked: typeof post.hasLiked === 'boolean' ? post.hasLiked : false,
+          createdAt: post.createdAt || '',
+          reaction_image_url: post.reaction_image_url || undefined,
+          user: post.user ? {
+            username: post.user.username || '',
+            heheScore: typeof post.user.heheScore === 'number' ? post.user.heheScore : 0
+          } : undefined
+        }))
+      console.log('Setting posts:', postsArray)
+      setPosts(postsArray)
       setTotalPages(data.pagination?.totalPages || 1)
       setCurrentPage(page)
     } catch (error: any) {
@@ -237,16 +258,38 @@ export default function MePage() {
 
     try {
       const res = await fetch('/api/me/liked', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` },
       })
 
-      if (res.ok) {
-        const data = await res.json()
-        console.log("liked posts data", data)
-        setLikedPosts(data)
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`)
       }
+
+      const data = await res.json()
+      console.log('Liked posts data:', data)
+
+      // Enhanced normalization for liked posts
+      let postsArray: Post[] = []
+      const rawPosts = Array.isArray(data) ? data : Array.isArray(data.posts) ? data.posts : []
+      postsArray = rawPosts
+        .filter(post => post && typeof post === 'object')
+        .map((post: any) => ({
+          id: post.id || post.postId || post.userId || `${Math.random()}`,
+          imageUrl: post.imageUrl || '',
+          caption: post.caption || '',
+          likes: typeof post.likes === 'number' ? post.likes : 0,
+          username: post.username || post.user?.username || 'Unknown',
+          heheScore: typeof post.heheScore === 'number' ? post.heheScore : 0,
+          hasLiked: typeof post.hasLiked === 'boolean' ? post.hasLiked : false,
+          createdAt: post.createdAt || '',
+          reaction_image_url: post.reaction_image_url || undefined,
+          user: post.user ? {
+            username: post.user.username || '',
+            heheScore: typeof post.user.heheScore === 'number' ? post.user.heheScore : 0
+          } : undefined
+        }))
+      console.log('Setting likedPosts:', postsArray)
+      setLikedPosts(postsArray)
     } catch (error) {
       console.error('Error fetching liked posts:', error)
     }
@@ -256,15 +299,12 @@ export default function MePage() {
     try {
       const token = localStorage.getItem('token')
       if (!token) {
-        console.error('No token found')
         router.push('/login')
         return
       }
 
       const res = await fetch('/api/users/me', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` },
       })
 
       if (!res.ok) {
@@ -272,13 +312,22 @@ export default function MePage() {
       }
 
       const data = await res.json()
+      console.log('User data:', data)
+
       if (data.error) {
         throw new Error(data.error)
       }
 
-      setUser(data)
-      // Update local storage with fresh user data
-      localStorage.setItem('user', JSON.stringify(data))
+      // Enhanced normalization for user data
+      const normalizedUser: User = {
+        id: data.id || data.userId || (data.user?.id || data.user?.userId) || '',
+        username: data.username || data.user?.username || '',
+        address: data.address || data.user?.address || '',
+        heheScore: typeof data.heheScore === 'number' ? data.heheScore : (typeof data.user?.heheScore === 'number' ? data.user.heheScore : 0),
+      }
+      console.log('Setting user:', normalizedUser)
+      setUser(normalizedUser)
+      localStorage.setItem('user', JSON.stringify(normalizedUser))
     } catch (error) {
       console.error('Error fetching user data:', error)
     }
@@ -287,18 +336,38 @@ export default function MePage() {
   const fetchAllPosts = async () => {
     try {
       const token = localStorage.getItem('token')
-      if (!token) return;
-      
+      if (!token) return
+
       const res = await fetch('/api/posts/all', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` },
       })
 
       if (res.ok) {
         const data = await res.json()
-        console.log('Fetched posts:', data.posts)
-        setAllPosts(data.posts || [])
+        console.log('All posts:', data)
+
+        // Enhanced normalization for all posts
+        let postsArray: Post[] = []
+        const rawPosts = Array.isArray(data.posts) ? data.posts : Array.isArray(data) ? data : []
+        postsArray = rawPosts
+          .filter(post => post && typeof post === 'object')
+          .map((post: any) => ({
+            id: post.id || post.postId || post.userId || `${Math.random()}`,
+            imageUrl: post.imageUrl || '',
+            caption: post.caption || '',
+            likes: typeof post.likes === 'number' ? post.likes : 0,
+            username: post.username || post.user?.username || 'Unknown',
+            heheScore: typeof post.heheScore === 'number' ? post.heheScore : 0,
+            hasLiked: typeof post.hasLiked === 'boolean' ? post.hasLiked : false,
+            createdAt: post.createdAt || '',
+            reaction_image_url: post.reaction_image_url || undefined,
+            user: post.user ? {
+              username: post.user.username || '',
+              heheScore: typeof post.user.heheScore === 'number' ? post.user.heheScore : 0
+            } : undefined
+          }))
+        console.log('Setting allPosts:', postsArray)
+        setAllPosts(postsArray)
       }
     } catch (error) {
       console.error('Error fetching all posts:', error)
@@ -674,7 +743,7 @@ export default function MePage() {
                       <button
                         onClick={() => handleBurnNFT(nft.tokenId, nft.postLikes || 0)}
                         disabled={burningNftId === nft.tokenId || loadingNftId === nft.tokenId}
-                        className="absolute bottom-2 right-2 bg-pink-500 text-white px-3 py-1 rounded-full text-sm font-medium hover:bg-pink-600 transition-colors disabled:cursor-not-allowed flex items-center gap-2"
+                        className="absolute bottom-2 right-2 bg-pink-500 text-white px-3 py-1 rounded-full text-sm font-medium hover:bg-pink-600 transition-colors  disabled:cursor-not-allowed flex items-center gap-2"
                       >
                         {loadingNftId === nft.tokenId ? (
                           <>
