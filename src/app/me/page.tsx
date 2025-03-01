@@ -20,9 +20,13 @@ const contract = getContract({
   chain: baseSepolia,
 });
 
-// Prepare the MemeMinted event
+// Prepare the events
 const memeMintedEvent = prepareEvent({
   signature: "event MemeMinted(uint256 indexed tokenId, address indexed minter, string memeUrl)"
+});
+
+const transferEvent = prepareEvent({
+  signature: "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)"
 });
 
 interface User {
@@ -72,18 +76,26 @@ export default function MePage() {
   const [flippedPostId, setFlippedPostId] = useState<string | null>(null)
   const [showScoreNotification, setShowScoreNotification] = useState(false);
   const [earnedScore, setEarnedScore] = useState(0);
-  const [burningNftId, setBurningNftId] = useState<string | null>(null);
   
   const activeAccount = useActiveAccount()
   const { disconnect } = useDisconnect()
   const wallet = useActiveWallet()
   const router = useRouter()
 
-  // Get NFT mint events using prepared event
-  const { data: events, isLoading: isLoadingEvents } = useContractEvents({
+  // Get NFT mint events
+  const { data: mintEvents, isLoading: isLoadingMintEvents } = useContractEvents({
     contract,
     events: [memeMintedEvent],
-    filters: { minter: activeAccount?.address },
+    queryFilter: {
+      fromBlock: 0n,
+      toBlock: "latest"
+    }
+  });
+
+  // Get all transfer events
+  const { data: transferEvents, isLoading: isLoadingTransferEvents } = useContractEvents({
+    contract,
+    events: [transferEvent],
     queryFilter: {
       fromBlock: 0n,
       toBlock: "latest"
@@ -92,7 +104,7 @@ export default function MePage() {
 
   // Effect for loading NFTs from events
   useEffect(() => {
-    if (!activeAccount?.address || isLoadingEvents || !events) {
+    if (!activeAccount?.address || isLoadingMintEvents || !mintEvents || isLoadingTransferEvents || !transferEvents) {
       setNfts([])
       setIsLoadingNFTs(false)
       return
@@ -101,27 +113,69 @@ export default function MePage() {
     const loadNFTsFromEvents = async () => {
       setIsLoadingNFTs(true)
       try {
-        const nftPromises = events.map(async (event) => {
-          const tokenId = event.args.tokenId.toString()
-          const memeUrl = event.args.memeUrl
+        // Track the current owner of each tokenId
+        const tokenOwners = new Map<string, string>();
+        
+        // Process all transfers to determine current ownership
+        transferEvents
+          .sort((a, b) => Number(a.blockNumber - b.blockNumber))
+          .forEach(event => {
+            const tokenId = event.args.tokenId.toString();
+            const to = event.args.to.toLowerCase();
+            tokenOwners.set(tokenId, to);
+          });
 
-          const matchingPost = allPosts.find(post => {
-            console.log('Comparing:', {
-              postUrl: post.imageUrl,
-              nftUrl: memeUrl,
-              heheScore: post.heheScore,
-              likes: post.likes
-            })
-            return post.imageUrl === memeUrl
-          })
-
-          return {
-            tokenId,
-            imageUrl: memeUrl,
-            burnEligible: !!matchingPost,
-            postLikes: matchingPost ? matchingPost.likes : 0
+        // For minted tokens that have no transfers, the minter is the owner
+        mintEvents.forEach(event => {
+          const tokenId = event.args.tokenId.toString();
+          if (!tokenOwners.has(tokenId)) {
+            tokenOwners.set(tokenId, event.args.minter.toLowerCase());
           }
-        })
+        });
+
+        // Get all tokens where the current owner is the active account
+        const userAddress = activeAccount.address.toLowerCase();
+        const ownedTokenIds = new Set(
+          Array.from(tokenOwners.entries())
+            .filter(([_, owner]) => owner === userAddress)
+            .map(([tokenId]) => tokenId)
+        );
+
+        // Helper function to normalize URLs for comparison
+        const normalizeUrl = (url: string) => {
+          // Remove file extension and query params
+          return url.split('?')[0].split('.').slice(0, -1).join('.');
+        };
+
+        // Map minted events to NFT objects if they're owned by the user
+        const nftPromises = mintEvents
+          .filter(event => ownedTokenIds.has(event.args.tokenId.toString()))
+          .map(async (event) => {
+            const tokenId = event.args.tokenId.toString()
+            const memeUrl = event.args.memeUrl
+
+            // Find matching post with over 3 likes
+            const normalizedMemeUrl = normalizeUrl(memeUrl);
+            const matchingPost = allPosts.find(post => {
+              const normalizedPostUrl = normalizeUrl(post.imageUrl);
+              console.log('Comparing:', {
+                postUrl: post.imageUrl,
+                normalizedPostUrl,
+                nftUrl: memeUrl,
+                normalizedMemeUrl,
+                heheScore: post.heheScore,
+                likes: post.likes
+              })
+              return normalizedPostUrl === normalizedMemeUrl;
+            })
+
+            return {
+              tokenId,
+              imageUrl: memeUrl,
+              burnEligible: matchingPost ? matchingPost.likes > 3 : false,
+              postLikes: matchingPost ? matchingPost.likes : 0
+            }
+          })
 
         const loadedNfts = await Promise.all(nftPromises)
         console.log('Loaded NFTs from events:', loadedNfts)
@@ -134,7 +188,7 @@ export default function MePage() {
     }
 
     loadNFTsFromEvents()
-  }, [activeAccount?.address, events, isLoadingEvents, allPosts])
+  }, [activeAccount?.address, mintEvents, isLoadingMintEvents, transferEvents, isLoadingTransferEvents, allPosts])
 
   const fetchPosts = async (page: number) => {
     setIsLoading(true)
@@ -265,33 +319,32 @@ export default function MePage() {
     router.push('/login')
   }
 
-  const handleBurnNFT = async (tokenId: string, likes: number) => {
-    if (burningNftId) return; // Prevent multiple burns
-    
+  const handleBurnNFT = async (tokenId: string, postLikes: number) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
+      const token = localStorage.getItem('token')
+      if (!token) return
 
-      setBurningNftId(tokenId);
-      const burnAddress = "0x000000000000000000000000000000000000dEaD";
+      const burnAddress = "0x0a29465289046513541F9deCC5Ee8dEEE10f956f"
 
-      // Prepare the transfer transaction
-      const transferTransaction = await prepareContractCall({
+      // Then transfer NFT to burn address
+      let transferTransaction = await prepareContractCall({
         contract,
         method: "function transferFrom(address from, address to, uint256 tokenId)",
         params: [
-          activeAccount?.address || "",
+          activeAccount?.address,
           burnAddress,
           BigInt(tokenId)
         ]
       });
+      console.log('tokenId', tokenId)
+      console.log('transferTransaction:', transferTransaction)
 
       let { transactionHash } = await sendTransaction({
-        account: activeAccount!,
+        account: activeAccount,
         transaction: transferTransaction,
       });
 
-      const receipt = await waitForReceipt({
+      let receipt = await waitForReceipt({
         client,
         chain: baseSepolia,
         transactionHash,
@@ -299,7 +352,7 @@ export default function MePage() {
 
       if (receipt.status === 'success') {
         // Then update user's heheScore
-        const heheScoreIncrease = Math.floor(likes / 2);
+        const heheScoreIncrease = Math.floor(postLikes / 2)
         const res = await fetch('/api/users/updateScore', {
           method: 'POST',
           headers: {
@@ -309,16 +362,16 @@ export default function MePage() {
           body: JSON.stringify({
             scoreIncrease: heheScoreIncrease
           })
-        });
+        })
 
         if (res.ok) {
           // Update local state
-          setNfts(prev => prev.filter(nft => nft.tokenId !== tokenId));
+          setNfts(prev => prev.filter(nft => nft.tokenId !== tokenId))
           if (user) {
             setUser({
               ...user,
               heheScore: user.heheScore + heheScoreIncrease
-            });
+            })
           }
           
           // Show score notification
@@ -328,11 +381,9 @@ export default function MePage() {
         }
       }
     } catch (error) {
-      console.error('Error burning NFT:', error);
-    } finally {
-      setBurningNftId(null);
+      console.error('Error burning NFT:', error)
     }
-  };
+  }
 
   useEffect(() => {
     const initializePage = async () => {
@@ -374,20 +425,7 @@ export default function MePage() {
   if (isInitializing) {
     return (
       <div className="fixed inset-0 bg-[#1f1f1f] flex items-center justify-center">
-        <div className="space-y-6 text-center">
-          <div className="logo-container">
-            <div className="logo-rays" />
-            <div className="logo-shine" />
-            <img 
-              src="/hehehub_logo.png" 
-              alt="HeheHub Logo"
-              className="w-24 h-24 mx-auto relative z-10"
-            />
-            <div className="sparkle" />
-            <div className="sparkle" />
-            <div className="sparkle" />
-            <div className="sparkle" />
-          </div>
+        <div className="space-y-4 text-center">
           <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-white">Loading your profile...</p>
         </div>
@@ -541,31 +579,10 @@ export default function MePage() {
                   <p className="text-gray-400">No posts yet</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-4 p-4">
-                  {posts.map((post) => (
-                    <div key={post.id} className="relative rounded-xl overflow-hidden aspect-square">
-                      <Image
-                        src={post.imageUrl}
-                        alt={post.caption || "Post image"}
-                        fill
-                        className="object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent">
-                        <div className="absolute bottom-0 left-0 right-0 p-4">
-                          <div className="flex items-center justify-between">
-                            <p className="text-white text-sm font-medium">
-                              @{post.user?.username || post.username || user?.username}
-                            </p>
-                            <div className="flex items-center space-x-1 bg-black/40 rounded-full px-2 py-1">
-                              <span className="text-sm">🤣</span>
-                              <span className="text-sm text-white">{post.likes}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <ImageReel 
+                  images={posts} 
+                  onEndReached={() => {}} 
+                />
               )}
             </div>
           )}
@@ -578,8 +595,8 @@ export default function MePage() {
                   <div key={i} className="animate-pulse bg-gray-800 rounded-lg aspect-square"></div>
                 ))
               ) : nfts.length > 0 ? (
-                nfts.map((nft, index) => (
-                  <div key={`nft-${nft.tokenId}-${index}`} className="relative group">
+                nfts.map((nft) => (
+                  <div key={nft.tokenId} className="relative group">
                     <div className="relative rounded-xl overflow-hidden aspect-square">
                       <Image
                         src={nft.imageUrl}
@@ -597,24 +614,9 @@ export default function MePage() {
                     {nft.burnEligible && (
                       <button
                         onClick={() => handleBurnNFT(nft.tokenId, nft.postLikes || 0)}
-                        disabled={burningNftId === nft.tokenId}
-                        className={`absolute bottom-2 right-2 bg-pink-500 text-white px-3 py-1 rounded-full 
-                                    text-sm font-medium transition-all duration-200 flex items-center space-x-1.5
-                                    ${burningNftId === nft.tokenId ? 
-                                      'cursor-not-allowed' : 
-                                      'hover:bg-pink-600'}`}
+                        className="absolute bottom-2 right-2 bg-pink-500 text-white px-3 py-1 rounded-full text-sm font-medium hover:bg-pink-600 transition-colors"
                       >
-                        {burningNftId === nft.tokenId ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            <span>Burning...</span>
-                          </>
-                        ) : (
-                          <>
-                            <span>🔥</span>
-                            <span>{Math.floor((nft.postLikes || 0) / 2)}</span>
-                          </>
-                        )}
+                        Burn for {Math.floor((nft.postLikes || 0) / 2)} Score
                       </button>
                     )}
                   </div>
