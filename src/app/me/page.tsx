@@ -112,43 +112,56 @@ export default function MePage() {
   }, [activeAccount?.address, balance, isLoadingBalance])
 
   useEffect(() => {
-    if (!balance || isLoadingBalance || currentNftIndex >= (balance ? Number(balance) : 0)) {
-      return
+    if (
+      !balance ||
+      isLoadingBalance ||
+      currentNftIndex >= (balance ? Number(balance) : 0)
+    ) {
+      return;
     }
-
+  
     if (!isLoadingTokenId && !isLoadingMemeUrl && tokenId && memeUrl) {
-      // Find matching post with over 3 heheScore
-      console.log('all posts', allPosts)
-      const matchingPost = allPosts.find(post => {
-        console.log('Comparing:', {
-          postUrl: post.imageUrl,
-          nftUrl: memeUrl,
-          heheScore: post.heheScore,
-          likes: post.likes
-        })
-        return post.imageUrl === memeUrl && post.likes > 3
-      })
-      console.log('Found matching post:', matchingPost)
-      
-      setNfts(prev => {
-        const newNft = {
-          tokenId: tokenId.toString(),
-          imageUrl: memeUrl,
-          burnEligible: !!matchingPost,
-          postLikes: matchingPost ? matchingPost.likes : 0
+      // Find matching post by exact URL match
+      const matchingPost = allPosts.find((post) => {
+        const cleanPostUrl = post.imageUrl.split('?')[0];
+        const cleanNftUrl = memeUrl.split('?')[0];
+        return cleanPostUrl === cleanNftUrl;
+      });
+  
+      const newTokenId = tokenId.toString();
+      const newNft = {
+        tokenId: newTokenId,
+        imageUrl: memeUrl,
+        burnEligible: true,
+        postLikes: matchingPost?.likes || 0,
+      };
+  
+      setNfts((prev) => {
+        // Only add if an NFT with this tokenId doesn't already exist
+        if (prev.some((nft) => nft.tokenId === newTokenId)) {
+          return prev;
         }
-        console.log('Adding NFT with likes:', newNft)
-        return [...prev, newNft]
-      })
-
+        return [...prev, newNft];
+      });
+  
       // Move to next NFT or finish
       if (currentNftIndex + 1 < (balance ? Number(balance) : 0)) {
-        setCurrentNftIndex(currentNftIndex + 1)
+        setCurrentNftIndex(currentNftIndex + 1);
       } else {
-        setIsLoadingNFTs(false)
+        setIsLoadingNFTs(false);
       }
     }
-  }, [balance, isLoadingBalance, currentNftIndex, tokenId, memeUrl, isLoadingTokenId, isLoadingMemeUrl, allPosts])
+  }, [
+    balance,
+    isLoadingBalance,
+    currentNftIndex,
+    tokenId,
+    memeUrl,
+    isLoadingTokenId,
+    isLoadingMemeUrl,
+    allPosts,
+  ]);
+  
 
   useEffect(() => {
     console.log('Current NFTs:', nfts)
@@ -559,10 +572,31 @@ export default function MePage() {
                   <p className="text-gray-400">No posts yet</p>
                 </div>
               ) : (
-                <ImageReel 
-                  images={posts} 
-                  onEndReached={() => {}} 
-                />
+                <div className="grid grid-cols-2 gap-4 p-4">
+                  {posts.map((post) => (
+                    <div key={post.id} className="relative rounded-xl overflow-hidden aspect-square">
+                      <Image
+                        src={post.imageUrl}
+                        alt={post.caption || "Post image"}
+                        fill
+                        className="object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent">
+                        <div className="absolute bottom-0 left-0 right-0 p-4">
+                          <div className="flex items-center justify-between">
+                            <p className="text-white text-sm font-medium">
+                              @{post.user?.username || post.username || user?.username}
+                            </p>
+                            <div className="flex items-center space-x-1 bg-black/40 rounded-full px-2 py-1">
+                              <span className="text-sm">🤣</span>
+                              <span className="text-sm text-white">{post.likes}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}
@@ -598,7 +632,7 @@ export default function MePage() {
                         className={`absolute bottom-2 right-2 bg-pink-500 text-white px-3 py-1 rounded-full 
                                     text-sm font-medium transition-all duration-200 flex items-center space-x-1.5
                                     ${burningNftId === nft.tokenId ? 
-                                      'opacity-75 cursor-not-allowed' : 
+                                      'cursor-not-allowed' : 
                                       'hover:bg-pink-600'}`}
                       >
                         {burningNftId === nft.tokenId ? (
